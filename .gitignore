@@ -29,11 +29,11 @@ Thumbs.db
 
 # Output / temp files
 output.*
-*.png
+
 
 # Dataset and log files (optional — comment out if you want to keep in git)
 *.xlsx
-*.csv
+
 trip_log
 
 # Git itself
@@ -41,7 +41,7 @@ trip_log
 
 # Ignore compiled models or cache
 *.h5
-*.pkl
+
 *.joblib
 *.npy
 *.npz
