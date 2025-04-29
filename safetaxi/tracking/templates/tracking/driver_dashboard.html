@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver Metrics Monitor</title>
+  <!-- Modern Chart.js with required plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
+  <!-- Add Tailwind for clean UI elements -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .chart-container {
+      position: relative;
+      height: 320px; /* Increased from 240px */
+      margin-bottom: 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      background-color: #fff;
+      padding: 20px; /* Increased from 16px */
+      transition: all 0.3s ease;
+    }
+    
+    .chart-container:hover {
+      box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 30px; /* Increased from 20px */
+    }
+    
+    .context-panel {
+      background-color: #f8fafc;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .context-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .anomaly-indicator {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #10b981;
+    }
+    
+    .anomaly-indicator.active {
+      background-color: #ef4444;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .current-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    
+    .controls {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: white;
+      padding: 10px 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">Driver Metrics Dashboard</h1>
+    <div class="investigation-controls" id="investigation-controls" style="display: none;">
+
+      <input id="investigator_note" type="textarea" placeholder="Investigation note">
+      <button id="submit_investigator_note" onclick="submit_investigator_note()">Investigated</button>
+    </div>
+    
+
+   
+    
+    <div class="controls flex justify-between items-center">
+      <div class="flex gap-2">
+        <button id="reset-zoom-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded transition-colors">
+          Reset Zoom
+        </button>
+        <button id="pause-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors">
+          Pause Data
+        </button>
+      </div>
+      <div class="flex items-center">
+        <span class="mr-2">Update Speed:</span>
+        <select id="update-speed" class="border rounded py-2 px-3">
+          <option value="100">Fast (100ms)</option>
+          <option value="500" selected>Normal (500ms)</option>
+          <option value="1000">Slow (1s)</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="context-panel grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div>
+        <h2 class="font-semibold text-lg mb-3">Road Context</h2>
+        <div class="context-item">
+          <span>Speed Limit:</span>
+          <span id="speed-limit" class="font-medium">65 km/h</span>
+        </div>
+        <div class="context-item">
+          <span>Road Type:</span>
+          <span id="road-type" class="font-medium">Urban - Collector</span>
+        </div>
+        <div class="context-item">
+          <span>Road Condition:</span>
+          <span id="road-condition" class="font-medium">Dry</span>
+        </div>
+      </div>
+      <div>
+        <h2 class="font-semibold text-lg mb-3">Environment</h2>
+        <div class="context-item">
+          <span>Time of Day:</span>
+          <span id="time-of-day" class="font-medium">Day</span>
+        </div>
+        <div class="context-item">
+          <span>Traffic Condition:</span>
+          <span id="traffic-condition" class="font-medium">Moderate</span>
+        </div>
+        <div class="context-item">
+          <span>Location:</span>
+          <span id="current-location" class="font-medium">40.7128° N, 74.0060° W</span>
+        </div>
+      </div>
+      <div>
+        <h2 class="font-semibold text-lg mb-3">Recent Anomalies</h2>
+        <div id="recent-anomalies" class="max-h-32 overflow-y-auto text-sm">
+          <div class="p-2 mb-1 bg-red-50 rounded border-l-4 border-red-500">
+            
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="metrics-grid">
+      <!-- Speed Chart -->
+      <div class="chart-container">
+        <div class="anomaly-indicator" id="speed-anomaly"></div>
+        <div class="chart-header">
+          <h3 class="font-semibold">Speed</h3>
+          <div class="current-value" id="speed-value">0 km/h</div>
+        </div>
+        <canvas id="speedChart"></canvas>
+      </div>
+      
+      <!-- Acceleration Chart -->
+      <div class="chart-container">
+        <div class="anomaly-indicator" id="accel-anomaly"></div>
+        <div class="chart-header">
+          <h3 class="font-semibold">Acceleration</h3>
+          <div class="current-value" id="accel-value">0 m/s²</div>
+        </div>
+        <canvas id="accelChart"></canvas>
+      </div>
+      
+      <!-- Jerk Chart -->
+      <div class="chart-container">
+        <div class="anomaly-indicator" id="jerk-anomaly"></div>
+        <div class="chart-header">
+          <h3 class="font-semibold">Jerk</h3>
+          <div class="current-value" id="jerk-value">0 m/s³</div>
+        </div>
+        <canvas id="jerkChart"></canvas>
+      </div>
+      
+      <!-- Heading & Yaw Chart Combined -->
+      <div class="chart-container">
+        <div class="anomaly-indicator" id="heading-anomaly"></div>
+        <div class="chart-header">
+          <h3 class="font-semibold">Direction Control</h3>
+          <div class="current-value" id="heading-value">0°</div>
+        </div>
+        <canvas id="headingYawChart"></canvas>
+      </div>
+      
+      <!-- Steering Chart -->
+      <div class="chart-container">
+        <div class="anomaly-indicator" id="steering-anomaly"></div>
+        <div class="chart-header">
+          <h3 class="font-semibold">Steering Angle</h3>
+          <div class="current-value" id="steering-value">0°</div>
+        </div>
+        <canvas id="steeringChart"></canvas>
+      </div>
+      
+
+    <div id="alert-text" style="
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff4c4c;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    z-index: 1000;
+    display: none;
+    ">
+    Alert! Please check the system!
+    </div>
+
+      <!-- Safety Score Chart (New) -->
+      
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let speedChart, accelChart, jerkChart, headingYawChart, steeringChart;
+    const plateInput = document.getElementById('plate-input');
+    const setPlateButton = document.getElementById('set-plate-button');
+
+
+    
+    
+
+    let targetPlate = "{{driver.assigned_taxi.plate_number}}";
+    const maxPoints = 200;
+    let isPaused = false;
+    let simulationInterval;
+    let anomalyHistory = [];
+    
+    let lastValues = {
+      speed: null,
+      acceleration: null,
+      jerk: null,
+      heading: null,
+      yawRate: null,
+      steeringAngle: null
+    };
+
+    let passenger_in_danger = "{{taxi.passenger_in_danger}}";
+
+    console.log("------------------------","{{taxi.passenger_in_danger}}");
+
+
+    if ("{{taxi.passenger_in_danger}}" == "True") {
+      document.getElementById("investigation-controls").style.display = "block";
+
+      console.log("passenger is in danger so control is toggled.")
+    }
+    
+
+
+
+    
+    
+
+    // Define thresholds
+    const thresholds = {
+      speed: 65, // km/h (adjusts based on speed limit)
+      acceleration: {
+        warning: 2.0, // m/s²
+        critical: 3.0  // m/s²
+      },
+      jerk: {
+        warning: 2.0, // m/s³
+        critical: 3.0  // m/s³
+      },
+      yaw: {
+        warning: 30, // degrees/sec
+        critical: 45 // degrees/sec
+      },
+      steering: {
+        warning: 30, // degrees
+        critical: 45 // degrees
+      }
+    };
+
+    // User configurable thresholds
+    let userThresholds = {
+      speed: 65, // Will be overridden by data from server
+      steering: {
+        warning: 30,
+        critical: 45
+      },
+      acceleration: {
+        warning: 2.0,
+        critical: 3.0
+      },
+      jerk: {
+        warning: 2.0,
+        critical: 3.0
+      },
+      yaw: {
+        warning: 30,
+        critical: 45
+      }
+    };
+
+    function submit_investigator_note(){
+      document.body.style.backgroundColor = "white";
+      fetch('/report-endangered/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          
+        },
+        body: JSON.stringify({
+          
+          driver: "{{driver}}" ,
+          
+          notes: document.getElementById('investigator_note').value,
+        })
+      })
+      .then(res => res.json())
+      .then(data => console.log(data));
+      
+    }
+
+    // Function to update thresholds
+    function updateThresholds() {
+      // Update the global thresholds
+      thresholds.speed = userThresholds.speed;
+      thresholds.steering = userThresholds.steering;
+      thresholds.acceleration = userThresholds.acceleration;
+      thresholds.jerk = userThresholds.jerk;
+      thresholds.yaw = userThresholds.yaw;
+      
+      // Update chart annotations
+      updateChartAnnotations();
+    }
+
+    // Function to update chart annotations with new thresholds
+    function updateChartAnnotations() {
+      // Clear existing annotations
+      accelChart.options.plugins.annotation.annotations.length = 0;
+      jerkChart.options.plugins.annotation.annotations.length = 0;
+      headingYawChart.options.plugins.annotation.annotations.length = 0;
+      steeringChart.options.plugins.annotation.annotations.length = 0;
+      
+      // Add acceleration annotations
+      accelChart.options.plugins.annotation.annotations.push(
+        {
+          type: 'line',
+          yMin: thresholds.acceleration.critical,
+          yMax: thresholds.acceleration.critical,
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        },
+        {
+          type: 'line',
+          yMin: -thresholds.acceleration.critical,
+          yMax: -thresholds.acceleration.critical,
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        },
+        {
+          type: 'line',
+          yMin: thresholds.acceleration.warning,
+          yMax: thresholds.acceleration.warning,
+          borderColor: 'rgba(251, 191, 36, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Warning', position: 'end' }
+        },
+        {
+          type: 'line',
+          yMin: -thresholds.acceleration.warning,
+          yMax: -thresholds.acceleration.warning,
+          borderColor: 'rgba(251, 191, 36, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Warning', position: 'end' }
+        }
+      );
+      
+      // Add jerk annotations
+      // (similar to acceleration annotations)
+      
+      // Add yaw annotations
+      headingYawChart.options.plugins.annotation.annotations.push(
+        {
+          type: 'line',
+          yMin: thresholds.yaw.critical,
+          yMax: thresholds.yaw.critical,
+          scaleID: 'yaw',
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        },
+        {
+          type: 'line',
+          yMin: -thresholds.yaw.critical,
+          yMax: -thresholds.yaw.critical,
+          scaleID: 'yaw',
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        }
+      );
+      
+      // Add steering annotations
+      steeringChart.options.plugins.annotation.annotations.push(
+        {
+          type: 'line',
+          yMin: thresholds.steering.critical,
+          yMax: thresholds.steering.critical,
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        },
+        {
+          type: 'line',
+          yMin: -thresholds.steering.critical,
+          yMax: -thresholds.steering.critical,
+          borderColor: 'rgba(239, 68, 68, 0.5)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: { content: 'Critical', position: 'end' }
+        }
+      );
+      
+      // Update all charts
+      accelChart.update('none');
+      jerkChart.update('none');
+      headingYawChart.update('none');
+      steeringChart.update('none');
+    }
+    
+    // Chart colors
+    const colors = {
+      speed: {
+        line: 'rgba(59, 130, 246, 0.8)',
+        fill: 'rgba(59, 130, 246, 0.2)',
+        pointNormal: 'rgba(59, 130, 246, 1)',
+        pointWarning: 'rgba(251, 191, 36, 1)',
+        pointCritical: 'rgba(239, 68, 68, 1)'
+      },
+      acceleration: {
+        line: 'rgba(16, 185, 129, 0.8)',
+        fill: 'rgba(16, 185, 129, 0.2)',
+        pointNormal: 'rgba(16, 185, 129, 1)',
+        pointWarning: 'rgba(251, 191, 36, 1)',
+        pointCritical: 'rgba(239, 68, 68, 1)'
+      },
+      jerk: {
+        line: 'rgba(245, 158, 11, 0.8)',
+        fill: 'rgba(245, 158, 11, 0.2)',
+        pointNormal: 'rgba(245, 158, 11, 1)',
+        pointWarning: 'rgba(251, 191, 36, 1)',
+        pointCritical: 'rgba(239, 68, 68, 1)'
+      },
+      heading: {
+        line: 'rgba(79, 70, 229, 0.8)',
+        fill: 'rgba(79, 70, 229, 0.2)',
+        pointNormal: 'rgba(79, 70, 229, 1)'
+      },
+      yaw: {
+        line: 'rgba(139, 92, 246, 0.8)',
+        fill: false,
+        pointNormal: 'rgba(139, 92, 246, 1)',
+        pointWarning: 'rgba(251, 191, 36, 1)',
+        pointCritical: 'rgba(239, 68, 68, 1)'
+      },
+      steering: {
+        line: 'rgba(190, 24, 93, 0.8)',
+        fill: 'rgba(190, 24, 93, 0.2)',
+        pointNormal: 'rgba(190, 24, 93, 1)',
+        pointWarning: 'rgba(251, 191, 36, 1)',
+        pointCritical: 'rgba(239, 68, 68, 1)'
+      },
+      
+    };
+    
+    // Initialize when the page loads
+    window.onload = function() {
+      initializeCharts();
+      setupEventListeners();
+      connectToRealWebSocket(targetPlate);
+    };
+    
+    function initializeCharts() {
+      // Speed Chart - Area chart with gradient
+      speedChart = createAreaChart(
+        'speedChart', 
+        'Speed (km/h)', 
+        colors.speed,
+        {
+          min: 0,
+          max: 120,
+          stepSize: 20
+        }
+      );
+      
+      // Acceleration Chart - Area chart with thresholds
+      accelChart = createAreaChart(
+        'accelChart', 
+        'Acceleration (m/s²)', 
+        colors.acceleration,
+        {
+          min: -5,
+          max: 5,
+          stepSize: 1
+        },
+        [
+          {
+            type: 'line',
+            yMin: thresholds.acceleration.critical,
+            yMax: thresholds.acceleration.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.acceleration.critical,
+            yMax: -thresholds.acceleration.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: thresholds.acceleration.warning,
+            yMax: thresholds.acceleration.warning,
+            borderColor: 'rgba(251, 191, 36, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Warning', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.acceleration.warning,
+            yMax: -thresholds.acceleration.warning,
+            borderColor: 'rgba(251, 191, 36, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Warning', position: 'end' }
+          }
+        ]
+      );
+      
+      // Jerk Chart - Area chart with thresholds
+      jerkChart = createAreaChart(
+        'jerkChart', 
+        'Jerk (m/s³)', 
+        colors.jerk,
+        {
+          min: -5,
+          max: 5,
+          stepSize: 1
+        },
+        [
+          {
+            type: 'line',
+            yMin: thresholds.jerk.critical,
+            yMax: thresholds.jerk.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.jerk.critical,
+            yMax: -thresholds.jerk.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: thresholds.jerk.warning,
+            yMax: thresholds.jerk.warning,
+            borderColor: 'rgba(251, 191, 36, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Warning', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.jerk.warning,
+            yMax: -thresholds.jerk.warning,
+            borderColor: 'rgba(251, 191, 36, 0.5)', 
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Warning', position: 'end' }
+          }
+        ]
+      );
+      
+      // Heading & Yaw Chart - Combined line chart
+      headingYawChart = createMultiLineChart(
+        'headingYawChart',
+        {
+          datasets: [
+            {
+              label: 'Heading (°)',
+              borderColor: colors.heading.line,
+              backgroundColor: colors.heading.fill,
+              data: [],
+              yAxisID: 'heading',
+              pointBackgroundColor: [],
+              tension: 0.3
+            },
+            {
+              label: 'Yaw Rate (°/s)',
+              borderColor: colors.yaw.line,
+              backgroundColor: colors.yaw.fill,
+              data: [],
+              yAxisID: 'yaw',
+              pointBackgroundColor: [],
+              tension: 0.3,
+              borderDash: [5, 5]
+            }
+          ]
+        },
+        {
+          heading: {
+            type: 'linear',
+            position: 'left',
+            min: 0,
+            max: 360,
+            ticks: { stepSize: 90 }
+          },
+          yaw: {
+            type: 'linear',
+            position: 'right',
+            min: -60,
+            max: 60,
+            ticks: { stepSize: 20 },
+            grid: { drawOnChartArea: false }
+          }
+        },
+        [
+          {
+            type: 'line',
+            yMin: thresholds.yaw.critical,
+            yMax: thresholds.yaw.critical,
+            scaleID: 'yaw',
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.yaw.critical,
+            yMax: -thresholds.yaw.critical,
+            scaleID: 'yaw',
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1, 
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          }
+        ]
+      );
+      
+      // Steering Chart - Area chart with thresholds
+      steeringChart = createAreaChart(
+        'steeringChart',
+        'Steering Angle (°)',
+        colors.steering,
+        {
+          min: -60,
+          max: 60,
+          stepSize: 20
+        },
+        [
+          {
+            type: 'line',
+            yMin: thresholds.steering.critical,
+            yMax: thresholds.steering.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          },
+          {
+            type: 'line',
+            yMin: -thresholds.steering.critical,
+            yMax: -thresholds.steering.critical,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: { content: 'Critical', position: 'end' }
+          }
+        ]
+      );
+      
+      // Safety Score Chart - Gauge-like area chart
+      
+    }
+    
+    function createAreaChart(canvasId, label, colors, yAxis, annotations = []) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      
+      // Create gradient fill
+      const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+      if (colors.fill) {
+        gradient.addColorStop(0, colors.fill);
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      }
+      
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: label,
+            data: [],
+            borderColor: colors.line,
+            backgroundColor: gradient,
+            fill: colors.fill !== false,
+            pointBackgroundColor: [],
+            pointBorderColor: 'rgba(255, 255, 255, 0.8)',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+            tension: 0.3, // Smooth curve
+            anomalyMessages: []
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 800,
+            easing: 'easeOutQuart'
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                unit: 'second',
+                displayFormats: {
+                  second: 'HH:mm:ss'
+                }
+              },
+              grid: {
+                display: false
+              },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 6
+              }
+            },
+            y: {
+              beginAtZero: yAxis.min === 0,
+              min: yAxis.min,
+              max: yAxis.max,
+              ticks: {
+                stepSize: yAxis.stepSize
+              }
+            }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              titleColor: '#1f2937',
+              bodyColor: '#1f2937',
+              borderColor: 'rgba(203, 213, 225, 1)',
+              borderWidth: 1,
+              padding: 12,
+              cornerRadius: 6,
+              displayColors: false,
+              callbacks: {
+                label: function(context) {
+                  const anomalyMsg = context.dataset.anomalyMessages[context.dataIndex];
+                  let label = `${context.dataset.label}: ${context.parsed.y}`;
+                  if (anomalyMsg) {
+                    label += ` (${anomalyMsg})`;
+                  }
+                  return label;
+                }
+              }
+            },
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'x'
+              },
+              zoom: {
+                wheel: {
+                  enabled: true
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              }
+            },
+            annotation: {
+              annotations: annotations
+            }
+          }
+        }
+      });
+    }
+    
+    function createMultiLineChart(canvasId, data, scales, annotations = []) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      
+      return new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 800,
+            easing: 'easeOutQuart'
+          },
+          scales: scales,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                boxWidth: 12,
+                usePointStyle: true,
+                padding: 20
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              titleColor: '#1f2937',
+              bodyColor: '#1f2937',
+              borderColor: 'rgba(203, 213, 225, 1)',
+              borderWidth: 1,
+              padding: 12,
+              cornerRadius: 6
+            },
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'x'
+              },
+              zoom: {
+                wheel: {
+                  enabled: true
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              }
+            },
+            annotation: {
+              annotations: annotations
+            }
+          }
+        }
+      });
+    }
+    
+    function setupEventListeners() {
+      // Reset zoom button
+      document.getElementById('reset-zoom-btn').addEventListener('click', function() {
+        resetAllZoom();
+      });
+      
+      // Pause/Resume button
+      document.getElementById('pause-btn').addEventListener('click', function() {
+        isPaused = !isPaused;
+        this.textContent = isPaused ? 'Resume Data' : 'Pause Data';
+        this.className = isPaused 
+          ? 'bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded transition-colors' 
+          : 'bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors';
+      });
+      
+      // Update speed dropdown
+      document.getElementById('update-speed').addEventListener('change', function() {
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          connectToRealWebSocket(targetPlate);
+        }
+      });
+    }
+    
+    function resetAllZoom() {
+      speedChart.resetZoom();
+      accelChart.resetZoom();
+      jerkChart.resetZoom();
+      headingYawChart.resetZoom();
+      steeringChart.resetZoom();
+    }
+    
+    // Detect anomalies and update indicators
+    function checkAnomaly(metricName, value) {
+      const thresholdConfig = thresholds[metricName];
+      if (!thresholdConfig) return { status: 'normal', message: '' };
+      
+      if (typeof thresholdConfig === 'number') {
+        // Simple threshold (like speed limit)
+        if (value > thresholdConfig) {
+          return { 
+            status: 'critical', 
+            message: `Exceeds ${metricName} limit (${thresholdConfig})` 
+          };
+        }
+      } else {
+        // Multi-level thresholds
+        if (Math.abs(value) > thresholdConfig.critical) {
+          return { 
+            status: 'critical', 
+            message: `Critical ${metricName}` 
+          };
+        } else if (Math.abs(value) > thresholdConfig.warning) {
+          return { 
+            status: 'warning', 
+            message: `High ${metricName}` 
+          };
+        }
+      }
+      
+      return { status: 'normal', message: '' };
+    }
+    
+    
+
+    
+    function updateChartData(chart, timestamp, value, anomalyData = { type: null, message: '' }) {
+      if (isPaused) return;
+
+      const chartId = chart.canvas.id;
+      const metricName = chartId.replace('Chart', '');
+      const lastValueKey = metricName === 'speed' ? 'speed' : 
+                          metricName === 'accel' ? 'acceleration' : 
+                          metricName === 'jerk' ? 'jerk' : 
+                          metricName === 'steering' ? 'steeringAngle' : null;
+      
+      if (lastValueKey && lastValues[lastValueKey] === value) {
+        return; // Skip update if value hasn't changed
+      }
+      
+      if (lastValueKey) {
+        lastValues[lastValueKey] = value;
+      }
+      
+      chart.data.labels.push(timestamp);
+      chart.data.datasets[0].data.push(value);
+      
+      // Set point color based on anomaly presence
+      let pointColor;
+      if (chart === speedChart) {
+        pointColor = anomalyData.type ? colors.speed.pointCritical : colors.speed.pointNormal;
+      } else if (chart === accelChart) {
+        pointColor = anomalyData.type ? colors.acceleration.pointCritical : colors.acceleration.pointNormal;
+      } else if (chart === jerkChart) {
+        pointColor = anomalyData.type ? colors.jerk.pointCritical : colors.jerk.pointNormal;
+      } else if (chart === steeringChart) {
+        pointColor = anomalyData.type ? colors.steering.pointCritical : colors.steering.pointNormal;
+      }
+      
+      chart.data.datasets[0].pointBackgroundColor.push(pointColor);
+      
+      // Store anomaly message if any
+      if (chart.data.datasets[0].anomalyMessages) {
+        chart.data.datasets[0].anomalyMessages.push(anomalyData.message);
+      }
+      
+      // Update anomaly indicator
+      if (chart === speedChart) {
+        updateAnomalyIndicator('speed-anomaly', anomalyData.type ? true : false);
+      } else if (chart === accelChart) {
+        updateAnomalyIndicator('accel-anomaly', anomalyData.type ? true : false);
+      } else if (chart === jerkChart) {
+        updateAnomalyIndicator('jerk-anomaly', anomalyData.type ? true : false);
+      } else if (chart === steeringChart) {
+        updateAnomalyIndicator('steering-anomaly', anomalyData.type ? true : false);
+      }
+      
+      // Limit data points to keep chart performant
+      if (chart.data.labels.length > maxPoints) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[0].pointBackgroundColor.shift();
+        if (chart.data.datasets[0].anomalyMessages) {
+          chart.data.datasets[0].anomalyMessages.shift();
+        }
+      }
+      
+      chart.update('none'); // Update without animation for performance
+    }
+    
+    // Update multi-line chart data (for heading & yaw)
+    function updateMultiLineChart(chart, timestamp, values) {
+      if (isPaused) return;
+
+      if (lastValues.heading === values.heading && lastValues.yawRate === values.yawRate) {
+        return; // Skip update if neither value has changed
+      }
+      
+      lastValues.heading = values.heading;
+      lastValues.yawRate = values.yawRate;
+      
+      chart.data.labels.push(timestamp);
+      
+      // Add heading data
+      chart.data.datasets[0].data.push(values.heading);
+      chart.data.datasets[0].pointBackgroundColor.push(colors.heading.pointNormal);
+      
+      // Add yaw data with anomaly check
+      const yawAnomalyData = checkAnomaly('yaw', values.yawRate);
+      const yawPointColor = yawAnomalyData.status === 'critical' ? colors.yaw.pointCritical : 
+                          yawAnomalyData.status === 'warning' ? colors.yaw.pointWarning :
+                          colors.yaw.pointNormal;
+      
+      chart.data.datasets[1].data.push(values.yawRate);
+      chart.data.datasets[1].pointBackgroundColor.push(yawPointColor);
+      
+      // Update anomaly indicator for heading/yaw
+      updateAnomalyIndicator('heading-anomaly', yawAnomalyData.status);
+      
+      // Limit data points
+      if (chart.data.labels.length > maxPoints) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(dataset => {
+          dataset.data.shift();
+          dataset.pointBackgroundColor.shift();
+        });
+      }
+      
+      chart.update('none');
+    }
+    
+    function updateAnomalyIndicator(elementId, hasAnomaly) {
+      const indicator = document.getElementById(elementId);
+      if (hasAnomaly) {
+        indicator.className = 'anomaly-indicator active';
+      } else {
+        indicator.className = 'anomaly-indicator';
+      }
+    }
+    
+
+
+
+    function addAnomalyToHistory(timestamp, type) {
+      const anomalyItem = document.createElement('div');
+      anomalyItem.className = 'p-2 mb-1 bg-red-50 rounded border-l-4 border-red-500';
+      
+      const anomalyTitle = document.createElement('div');
+      anomalyTitle.className = 'font-medium';
+      anomalyTitle.textContent = type;
+      
+      const anomalyTime = document.createElement('div');
+      anomalyTime.className = 'text-gray-500';
+      anomalyTime.textContent = timestamp.toLocaleTimeString();
+      
+      anomalyItem.appendChild(anomalyTitle);
+      anomalyItem.appendChild(anomalyTime);
+      
+      const recentAnomalies = document.getElementById('recent-anomalies');
+      recentAnomalies.prepend(anomalyItem);
+      
+      // Limit anomaly history
+      if (recentAnomalies.children.length > 5) {
+        recentAnomalies.removeChild(recentAnomalies.lastChild);
+      }
+    }
+    
+    
+  
+    
+    
+    function updateContextValues(context) {
+
+      const roadTypeMap = ["Highway", "City", "Rural"];
+      const roadConditionMap = ["Dry", "Wet", "Snow", "Ice"];
+      const timeOfDayMap = ["Night", "Morning", "Afternoon", "Evening"];
+      const trafficConditionMap = ["Light", "Moderate", "Heavy"];
+      document.getElementById('speed-limit').textContent = context.speedLimit;  
+      document.getElementById('road-type').textContent = roadTypeMap[context.roadType];
+      document.getElementById('road-condition').textContent = roadConditionMap[context.roadCondition];
+      document.getElementById('time-of-day').textContent = timeOfDayMap[context.timeOfDay];
+      document.getElementById('traffic-condition').textContent = trafficConditionMap[context.trafficCondition];
+
+      document.getElementById('current-location').textContent = context.location;
+    }
+    
+    function updateCurrentValues(values) {
+      document.getElementById('speed-value').textContent = `${values.speed} km/h`;
+      document.getElementById('accel-value').textContent = `${values.acceleration} m/s²`;
+      document.getElementById('jerk-value').textContent = `${values.jerk} m/s³`;
+      document.getElementById('heading-value').textContent = `${values.heading}° | ${values.yawRate}°/s`;
+      document.getElementById('steering-value').textContent = `${values.steeringAngle}°`;
+    }
+
+
+
+    function alertblinker(message) {
+      document.body.style.backgroundColor = 'rgba(255, 0, 0, 0.39)';
+      
+      // Show the alert text
+      const alertBox = document.getElementById('alert-text');
+      alertBox.textContent = message;
+      alertBox.style.display = 'block';
+    
+      setTimeout(function() {
+        document.body.style.backgroundColor = 'rgba(47, 25, 211, 0.23)';
+        
+        // Hide the alert text
+        alertBox.style.display = 'none';
+      }, 600);
+    }
+    
+    
+    function connectToRealWebSocket(targetPlate) {
+      console.log("Connecting to WebSocket...");
+      const ws = new WebSocket("ws://127.0.0.1:8000/ws/taxi/updates/");
+      
+      // Replace the ws.onmessage function
+      ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log("Received data:", data);
+
+
+        console.log("tegert plate:", targetPlate)
+        
+        // Filter for target taxi
+        let taxiData;
+        if (Array.isArray(data)) {
+          taxiData = data.find(taxi => taxi.plate_number === targetPlate);
+          if (!taxiData) return;
+        } else {
+          taxiData = data;
+          if (!taxiData.plate_number || taxiData.plate_number !== targetPlate) return;
+        }
+
+        if (taxiData.passenger_in_danger === true) {
+
+          alertblinker("Passenger in danger!");
+          console.log("taxidata", taxiData);
+        }
+
+
+        updateRawDataTable(taxiData.metrics);
+
+        
+        // Get speed limit from data and update threshold
+        if (taxiData.metrics.speed_limit) {
+          userThresholds.speed = parseFloat(taxiData.metrics.speed_limit);
+          updateThresholds();
+        }
+        
+        // Update context panels
+        updateContextValues({
+          speedLimit: `${taxiData.metrics.speed_limit} km/h`,
+          roadType: taxiData.metrics.road_type,
+          roadCondition: taxiData.metrics.road_condition,
+          timeOfDay: taxiData.metrics.time_of_day,
+          trafficCondition: taxiData.metrics.traffic_condition,
+          location: `${taxiData.current_lat}, ${taxiData.current_lon}`
+        });
+        
+        // Extract metrics
+        const metrics = {
+          speed: taxiData.metrics.speed || 0,
+          acceleration: taxiData.metrics.acceleration || 0,
+          jerk: taxiData.metrics.jerk || 0,
+          heading: taxiData.metrics.heading || 0,
+          yawRate: taxiData.metrics.yaw_rate || 0,
+          steeringAngle: taxiData.metrics.steering_angle || 0
+        };
+        
+        // Determine anomaly and which chart it belongs to
+        let speedAnomaly = { type: null, message: '' };
+        let accelAnomaly = { type: null, message: '' };
+        let jerkAnomaly = { type: null, message: '' };
+        let steeringAnomaly = { type: null, message: '' };
+        let yawAnomaly = { type: null, message: '' };
+        if (taxiData.metrics.anomaly) {
+          const anomalyType = taxiData.metrics.anomaly.type;
+          const anomalyObj = { type: anomalyType, message: anomalyType };
+          
+          // Map anomaly to appropriate chart
+          if (anomalyType === 'speeding') {
+            speedAnomaly = anomalyObj;
+            addAnomalyToHistory(new Date(), anomalyType);
+          } else if (anomalyType === 'sudden_acceleration' || anomalyType === 'sudden_brake' || anomalyType === 'sudden_stop') {
+            accelAnomaly = anomalyObj;
+            addAnomalyToHistory(new Date(), anomalyType);
+          } else if (anomalyType === 'sudden_turn' || anomalyType === 'tight_turn') {
+            yawAnomaly = anomalyObj;
+            steeringAnomaly = anomalyObj;
+            addAnomalyToHistory(new Date(), anomalyType);
+          }
+        } else {
+          // Use threshold-based anomaly detection as fallback
+          speedAnomaly = accelAnomaly = jerkAnomaly = steeringAnomaly = yawAnomaly = { status: 'normal', message: '' };
+
+          }
+        
+        // Update charts
+        const time = new Date();
+        updateChartData(speedChart, time, metrics.speed, speedAnomaly);
+        updateChartData(accelChart, time, metrics.acceleration, accelAnomaly);
+        updateChartData(jerkChart, time, metrics.jerk, jerkAnomaly);
+        updateChartData(steeringChart, time, metrics.steeringAngle, steeringAnomaly);
+        
+        // For the multi-line chart, we need to set the point color for yaw rate
+        updateMultiLineChart(headingYawChart, time, { 
+          heading: metrics.heading, 
+          yawRate: metrics.yawRate,
+          yawAnomaly: yawAnomaly
+        });
+
+        // Update the updateMultiLineChart function to handle anomalies
+        function updateMultiLineChart(chart, timestamp, values) {
+          if (isPaused) return;
+          
+          // Check if heading or yawRate values have changed
+          if (lastValues.heading === values.heading && lastValues.yawRate === values.yawRate) {
+            return; // Skip update if neither value has changed
+          }
+          
+          lastValues.heading = values.heading;
+          lastValues.yawRate = values.yawRate;
+          
+          chart.data.labels.push(timestamp);
+          
+          // Add heading data
+          chart.data.datasets[0].data.push(values.heading);
+          chart.data.datasets[0].pointBackgroundColor.push(colors.heading.pointNormal);
+          
+          // Add yaw data with anomaly check
+          const yawPointColor = values.yawAnomaly.type ? colors.yaw.pointCritical : colors.yaw.pointNormal;
+          
+          chart.data.datasets[1].data.push(values.yawRate);
+          chart.data.datasets[1].pointBackgroundColor.push(yawPointColor);
+          
+          // Update anomaly indicator for heading/yaw
+          updateAnomalyIndicator('heading-anomaly', values.yawAnomaly.type ? true : false);
+          
+          // Limit data points
+          if (chart.data.labels.length > maxPoints) {
+            chart.data.labels.shift();
+            chart.data.datasets.forEach(dataset => {
+              dataset.data.shift();
+              dataset.pointBackgroundColor.shift();
+            });
+          }
+          
+          chart.update('none');
+        }
+        
+        // Update current values
+        updateCurrentValues({
+          speed: metrics.speed.toFixed(1),
+          acceleration: metrics.acceleration.toFixed(2),
+          jerk: metrics.jerk.toFixed(2),
+          heading: Math.round(metrics.heading),
+          yawRate: metrics.yawRate.toFixed(1),
+          steeringAngle: metrics.steeringAngle.toFixed(1),
+        });
+      };
+      
+      ws.onerror = function(error) {
+        console.error("WebSocket error:", error);
+      };
+      
+      return ws;
+    }
+  </script>
+</body>
+</html>

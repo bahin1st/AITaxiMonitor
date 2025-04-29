@@ -1,0 +1,2 @@
+web: daphne safetaxi.asgi:application
+worker: daphne safetaxi.asgi:application

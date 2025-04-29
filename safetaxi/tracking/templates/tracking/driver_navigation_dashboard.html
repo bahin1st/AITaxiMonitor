@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taxi Tracking with Draggable Pins</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.js"></script>
+
+  <script src="{% static 'js/dashboard-bridge.js' %}"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f8f9fa;
+    }
+    
+    #dashboard-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background-color: #1e88e5;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    #welcome {
+      font-size: 16px;
+    }
+    
+    .profile-button {
+      background-color: transparent;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s;
+    }
+    
+    .profile-button:hover {
+      background-color: rgba(255,255,255,0.2);
+    }
+    
+    #layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    #sidebar {
+      width: 320px;
+      background-color: white;
+      border-right: 1px solid #e0e0e0;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .sidebar-section {
+      background-color: #f5f7fa;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .sidebar-section h4 {
+      margin-bottom: 12px;
+      color: #1e88e5;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    
+    .pins-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .pin {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .start-pin {
+      background-color: #4caf50;
+      color: white;
+    }
+    
+    .end-pin {
+      background-color: #f44336;
+      color: white;
+    }
+    
+    #locations {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    
+    .anomaly-settings {
+      margin-bottom: 15px;
+    }
+    
+    .anomaly-settings input {
+      width: 80px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    
+    .control-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .control-button {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.3s;
+    }
+    
+    .primary-btn {
+      background-color: #1e88e5;
+      color: white;
+    }
+    
+    .primary-btn:hover {
+      background-color: #1976d2;
+    }
+    
+    .secondary-btn {
+      background-color: #ff9800;
+      color: white;
+    }
+    
+    .secondary-btn:hover {
+      background-color: #f57c00;
+    }
+    
+    .rating-btn {
+      background-color: #7e57c2;
+      color: white;
+    }
+    
+    .rating-btn:hover {
+      background-color: #673ab7;
+    }
+    
+    .control-button:disabled {
+      background-color: #e0e0e0;
+      color: #9e9e9e;
+      cursor: not-allowed;
+    }
+    
+    .status-display {
+      background-color: #e3f2fd;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    
+    .metric-item {
+      background-color: #ffffff;
+      padding: 8px;
+      border-radius: 4px;
+      border-left: 3px solid #1e88e5;
+      font-size: 13px;
+    }
+    
+    .metric-label {
+      font-weight: 500;
+      color: #757575;
+    }
+    
+    .anomaly-status {
+      grid-column: 1 / -1;
+      border-left: 3px solid #f44336;
+    }
+    
+    #main-content {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #map {
+      height: 100%;
+      width: 100%;
+      background-color: #eee;
+    }
+    
+    #anomaly-sidebar {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 300px;
+      max-height: 500px;
+      overflow-y: auto;
+      background: white;
+      border: none;
+      padding: 0;
+      box-shadow: 0 0 20px rgba(0,0,0,0.15);
+      z-index: 999;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .anomaly-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f44336;
+      color: white;
+      padding: 12px 15px;
+      border-radius: 8px 8px 0 0;
+    }
+    
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    
+    #anomaly-list {
+      list-style: none;
+      padding: 15px;
+    }
+    
+    #anomaly-list li {
+      padding: 10px;
+      margin-bottom: 8px;
+      background-color: #ffebee;
+      border-left: 3px solid #f44336;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #anomaly-sidebar-checkbox input[type="checkbox"]:checked ~ #anomaly-sidebar {
+      display: block;
+    }
+    
+    #anomaly-sidebar-checkbox input[type="checkbox"]:not(:checked) ~ #anomaly-sidebar {
+      display: none;
+    }
+
+    #addressResults {
+      max-height: 200px;    
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ccc;
+      margin-top: 4px;
+      padding: 0;
+    }
+    #addressResults li {
+      padding: 8px;
+      cursor: pointer;
+    }
+    #addressResults li:hover {
+      background: #f0f0f0;
+    }
+    
+  </style>
+  <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+</head>
+<body>
+  <!-- Main structure with updated layout -->
+<div id="dashboard-container">
+  <div id="alert-text" style="
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff4c4c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+            ">
+            Alert! Please check the system!
+            </div>
+  <!-- Header with profile -->
+  <header class="dashboard-header">
+    <div id="welcome">
+      <p><strong>Welcome</strong> <span id="driver-name"></span></p>
+      <p>Taxi Plate: <span id="taxi-plate"></span></p>
+    </div>
+    <div><h3>Safe Zone: </h3><h3 id="safe-zone"> 0.0 meters</h3></div>
+    <div id="profile-section">
+      <button id="profileBtn" class="profile-button" >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        
+      </button>
+      <a href="{% url 'driver_profile' username=driver %}"><span style="color: white; text-decoration: none;">Profile</span></a>
+
+    </div>
+  </header>
+
+  <!-- Main content area -->
+  <div id="layout">
+    <!-- Left sidebar with ride controls -->
+    <div id="sidebar">
+      <div class="sidebar-section">
+        <h4>Trip Planning</h4>
+        <div class="pins-container">
+          <div class="pin end-pin" draggable="true" id="endPin" data-type="end">E</div>
+          <div class="pin deviation-pin" draggable="true" id="deviationPin" data-type="deviation" style="display: none; background-color: #ff9800; color: white;">D</div>
+
+        </div>
+        <div class="deviation-checkbox" style="margin-top: 10px;">
+          <input type="checkbox" id="enable-deviation" />
+          <label for="enable-deviation">Enable Route Deviation</label>
+
+          <label>
+            <input type="checkbox" id="easeToToggle" checked />
+            Enable Camera Tracking
+          </label>
+        </div>
+        <div id="locations">
+          <div id="startLocation">Starting: Not selected</div>
+          <div id="endLocation">Destination: Not selected</div>
+          <div id="deviationLocation" style="display: none;">Deviation: Not selected</div>
+          
+        </div>
+        <div id="address-search-container">
+          <input
+            type="text"
+            id="addressSearch"
+            placeholder="Search address (e.g. Al‐Farabi 71/28)…"
+            autocomplete="off"
+          />
+          <ul id="addressResults" style="list-style:none; padding:0; margin:0;"></ul>
+        </div>
+        
+        <div><p id="distanceDisplay">Distance: 0 km</p></div>
+      </div>
+      
+      <div class="sidebar-section">
+        <div id="anomaly-sidebar-checkbox">
+          <input type="checkbox" id="show-anomaly-sidebar" checked>
+          <label for="show-anomaly-sidebar">Show Anomaly Alerts</label>
+        </div>
+        <h4>Ride Controls</h4>
+        <div class="anomaly-settings">
+          <label for="anomalyPercentage">Anomaly percentage:</label>
+          <input type="number" id="anomalyPercentage" value="0.1" min="0" max="1" step="0.01">
+        </div>
+        <div class="">
+          <label for="customername">Passenger:</label>
+          {{customers}}
+          <input type="hidden" name="customer_id" id="customer_id" >
+          
+          </div>
+        
+        <div class="control-buttons">
+          <button id="startRideBtn" class="control-button primary-btn" disabled>Start Ride</button>
+          <button id="endRideBtn" class="control-button secondary-btn" disabled>End Ride</button>
+          
+        </div>
+        
+        <div id="rideStatus" class="status-display">Status: Ready</div>
+      </div>
+      
+      <!-- Taxi metrics display with better organization -->
+      <div class="sidebar-section">
+        <h4>Taxi Metrics</h4>
+        <div id="taxiMetrics" class="metrics-grid">
+          <div class="metric-item">
+            <span class="metric-label">Speed:</span>
+            <span id="taxiSpeed" class="metric-value">- km/h</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Accel:</span>
+            <span id="taxiAccel" class="metric-value">- m/s²</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Heading:</span>
+            <span id="taxiHeading" class="metric-value">- °</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Yaw Rate:</span>
+            <span id="taxiYawRate" class="metric-value">- °/s</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Steering:</span>
+            <span id="taxiSteeringAngle" class="metric-value">- °</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Jerk:</span>
+            <span id="taxiJerk" class="metric-value">- m/s³</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Road Type:</span>
+            <span id="taxiRoadType" class="metric-value">-</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Traffic:</span>
+            <span id="taxiTrafficCondition" class="metric-value">-</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Road Condition:</span>
+            <span id="taxiRoadCondition" class="metric-value">-</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Time:</span>
+            <span id="taxiTimeOfDay" class="metric-value">-</span>
+          </div>
+          <div class="metric-item anomaly-status">
+            <span class="metric-label">Anomaly:</span>
+            <span id="anomalyStatus" class="metric-value">None</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main map area -->
+    <div id="main-content">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <!-- Anomaly sidebar - floating with improved styling -->
+  
+  
+  <div id="anomaly-sidebar" style="display: block;">
+    <div class="anomaly-header">
+      <h4>Anomaly Alerts</h4>
+      <button id="closeAnomalyBtn" class="close-btn">×</button>
+    </div>
+    <ul id="anomaly-list"></ul>
+  </div>
+</div>
+<!-- Trip Detail Modal -->
+<div class="modal fade" id="tripDetailModal" tabindex="-1" aria-labelledby="tripDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="tripDetailModalLabel">🎉 Trip Completed</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center px-5">
+        <div class="mb-3">
+          <h2 class="fw-bold text-success">Thanks for the ride!</h2>
+          <p class="text-muted">Here's a summary of your completed trip:</p>
+        </div>
+
+        <div class="mb-4">
+          <div id="trip-details-content" class="text-start mx-auto" style="max-width: 600px;">
+            <!-- Trip details will be injected here -->
+          </div>
+          {% comment %} <p id="actualDistanceDisplay"></p> {% endcomment %}
+        </div>
+
+        <div class="mb-4">
+          <h4 class="fw-semibold">⭐ Trip Rating</h4>
+          <div class="fs-3 text-warning">
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+            <i class="bi bi-star-fill"></i>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-outline-success rounded-pill px-4 py-2" data-bs-dismiss="modal">
+          Close Summary
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+
+
+
+     mapboxgl.accessToken = "{{mapboxApiKey}}";
+
+
+
+     let taxiheading = 123.2;
+     // 2) init map
+     const map = new mapboxgl.Map({
+         container: 'map',
+         style:      'mapbox://styles/bahin/cm9trj70q000u01sh4tvga1g7',
+         center:     ["{{taxi.current_lon}}","{{taxi.current_lat}}"],
+         zoom:       22,
+         pitch: 80,
+         bearing:  taxiheading,  // assume `heading` is provided (0–360°)
+         duration: 1000 ,
+         maxZoom: 22,  // Max zoom level
+         minZoom: 5,  // Min zoom level
+     });
+
+     map.on('load', () => {
+         // 3) zoom + compass
+         map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+         // 4) fullscreen button
+         map.addControl(new mapboxgl.FullscreenControl(),    'bottom-right');
+
+         // 5) scale bar
+         map.addControl(new mapboxgl.ScaleControl({ maxWidth: 200, unit: 'metric', background: 'black' }), 'bottom-left');
+
+         map.addControl(new mapboxgl.GeolocateControl({
+          positionOptions: {
+              enableHighAccuracy: true
+          },
+          trackUserLocation: true,
+          showUserLocation: true
+      }), 'bottom-right');
+         
+     });
+     
+
+       /////////////////////////////////////////////////////// Interactivity JS///////////////////////////////////
+
+     
+       let feature;
+
+       map.addInteraction("Click-handler", {
+       type: "click",
+       target: {
+           "featuresetId": "buildings",
+           "importId": "basemap"
+       },
+       handler: (e) => {
+           if (feature) {
+               map.setFeatureState(feature, { ["select"]: false });
+           feature = null;
+           } else {
+           map.setFeatureState(e.feature, { ["select"]: true });
+           feature = e.feature;
+           }
+       }
+       });
+   
+
+
+
+       
+
+
+
+
+
+
+
+
+       /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+       const addressInput   = document.getElementById('addressSearch');
+       const addressResults = document.getElementById('addressResults');
+       
+       let searchTimeout = null;
+       
+       // 2.1 Debounce input so we don’t hammer the API on every keystroke
+       addressInput.addEventListener('input', () => {
+         clearTimeout(searchTimeout);
+         const q = addressInput.value.trim();
+         if (!q) {
+           addressResults.innerHTML = '';
+           return;
+         }
+         searchTimeout = setTimeout(() => nominatimSearch(q), 300);
+       });
+       
+       // 2.2 Perform the Nominatim search
+       function nominatimSearch(query) {
+        const url = [
+          'https://nominatim.openstreetmap.org/search?format=jsonv2',
+          'countrycodes=kz',
+          `q=${encodeURIComponent(query)}`,
+          'addressdetails=1',
+          'limit=5'
+        ].join('&');
+      
+        fetch(url)
+          .then(r => r.json())
+          .then(results => {
+            addressResults.innerHTML = results
+              .map(r => `
+                <li data-lat="${r.lat}" data-lon="${r.lon}">
+                  ${r.display_name}
+                </li>
+              `).join('');
+          })
+          .catch(err => {
+            console.error('Search error:', err);
+            addressResults.innerHTML = `<li>Error searching</li>`;
+          });
+      }
+      
+       
+       // 2.3 When the user clicks one of those <li>, drop the pin
+       addressResults.addEventListener('click', e => {
+         const li = e.target.closest('li');
+         if (!li) return;
+         const lat = parseFloat(li.dataset.lat);
+         const lon = parseFloat(li.dataset.lon);
+         const coords = { lat, lng: lon };
+
+         latestTaxiLngLat = {
+          lat: currentTaxiLocation.lat,
+          lng: currentTaxiLocation.lng
+        };
+      
+        console.log("📍 Fresh start after drag:", latestTaxiLngLat);
+        addOrUpdateMarker('start', latestTaxiLngLat);
+       
+         addOrUpdateMarker('end', coords);
+       
+         //  • reverse-geocode to fill in the label
+         reverseGeocode(coords, 'end');
+         updateRoute();
+
+         //  • clear the list & input
+         addressResults.innerHTML = '';
+         addressInput.value = li.textContent.trim();
+       });
+       
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+    // Add deviation pin functionality
+    let deviationMarker = null;
+    let deviationRouteLayerId = null;
+    let isDeviationEnabled = false;
+
+    document.getElementById('deviationPin').addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', 'deviation');
+    });
+
+    document.getElementById('enable-deviation').addEventListener('change', function() {
+      isDeviationEnabled = this.checked;
+      
+      // Show/hide the deviation pin and location text
+      document.getElementById('deviationPin').style.display = isDeviationEnabled ? 'flex' : 'none';
+      document.getElementById('deviationLocation').style.display = isDeviationEnabled ? 'block' : 'none';
+      
+      // If enabling deviation and we have an active end marker, we could reset it
+      if (isDeviationEnabled && endMarker) {
+        // endPin.setAttribute("draggable", "false");
+      }
+    });
+
+
+
+    
+
+    // Variables
+    //let actualDistanceTraveled = null;
+    let startMarker = null;
+    let endMarker = null;
+    let taxiMarker = null;
+    const routeLayerId = 'routeLayer';
+    let routeCoordinates = null;
+    let wsConnection = null;
+    let rideActive = false;
+    let routeGeoJSON=null
+    let driver = "{{ driver }}";
+    let taxi_plate = "{{taxi}}";
+    let current_route=[];
+    let currentTaxiLocation = { lat: 0, lng: 0 }; // Global taxi location
+
+    let startLocation = '';
+    let endLocation = '';
+    let currentRide = '';
+    let starttime = null;
+    let distance = null;
+    latestTaxiLngLat = {};
+    let anomalyCounts = {};
+    let customerId; //Default 1st customer not to have eror
+
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const customerSelect = document.querySelector('select[name="customer"]');
+      customerId = customerSelect.value;
+      document.querySelector('#customer_id').value = customerId;
+    });
+
+
+
+
+    console.log("current taxi location: ", currentTaxiLocation);
+    document.getElementById('driver-name').textContent = driver;
+    document.getElementById('taxi-plate').textContent = taxi_plate;
+    
+
+    anomalyMarkers = {};
+    // Control buttons
+    const startRideBtn = document.getElementById('startRideBtn');
+
+    const endRideBtn = document.getElementById('endRideBtn');
+    const rideStatus = document.getElementById('rideStatus');
+    
+    // Taxi metrics elements
+    const taxiSpeed = document.getElementById('taxiSpeed');
+    const taxiAccel = document.getElementById('taxiAccel');
+    const safeZone = document.getElementById('safe-zone');
+    const anomalyStatus = document.getElementById('anomalyStatus');
+    const taxiMarkers = {};  
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws/taxi/updates/');
+    let targetPlate= '{{taxi}}';
+    
+    let pingInterval;
+    let reconnectTimeout;
+    
+
+    document.getElementById('show-anomaly-sidebar').addEventListener('change', function() {
+      var sidebar = document.getElementById('anomaly-sidebar');
+      if (this.checked) {
+        sidebar.style.display = 'block';
+      } else {
+        sidebar.style.display = 'none';
+      }
+    });
+
+    function alertblinker(message) {
+      document.body.style.backgroundColor = 'rgba(255, 0, 0, 0.39)';
+      
+      // Show the alert text
+      const alertBox = document.getElementById('alert-text');
+      alertBox.textContent = message;
+      alertBox.style.display = 'block';
+    
+      setTimeout(function() {
+        document.body.style.backgroundColor = 'white';
+        
+        // Hide the alert text
+        alertBox.style.display = 'none';
+      }, 800);
+    }
+
+    
+
+    let previousPosition = null;
+    let animationFrameId = null;
+    
+    function animateMarker(marker, start, end, duration = 2000) {
+      const startTime = performance.now();
+    
+      function animate(currentTime) {
+        const elapsed = currentTime - startTime;
+        const t = Math.min(elapsed / duration, 1); // Normalize time
+    
+        const lng = start.lng + (end.lng - start.lng) * t;
+        const lat = start.lat + (end.lat - start.lat) * t;
+    
+        marker.setLngLat([lng, lat]);
+    
+        if (t < 1) {
+          animationFrameId = requestAnimationFrame(animate);
+        }
+      }
+    
+      animationFrameId = requestAnimationFrame(animate);
+    }
+    
+    map.on('zoom', () => {
+      const zoom = map.getZoom();
+      let size = 30;
+  
+      if (zoom >= 20) size = 45;
+      else if (zoom >= 18) size = 35;
+      else if (zoom >= 16) size = 25;
+      else size = 20;
+  
+      Object.values(taxiMarkers).forEach(marker => {
+          const el = marker.getElement();
+          el.style.width = `${size}px`;
+          el.style.height = `${size}px`;
+      });
+  });
+  
+
+    function connectWebSocket() {
+      let previousPosition = {};
+      let animationFrameId = null;
+    
+      function animateMarker(marker, start, end, duration = 1000) {
+        const startTime = performance.now();
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    
+        function animate(now) {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / duration, 1);
+    
+          const lng = start.lng + (end.lng - start.lng) * t;
+          const lat = start.lat + (end.lat - start.lat) * t;
+          marker.setLngLat([lng, lat]);
+    
+          if (t < 1) {
+            animationFrameId = requestAnimationFrame(animate);
+          }
+        }
+    
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    
+      ws.onopen = function () {
+        console.log("✅ WebSocket connected");
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+        }, 25000);
+      };
+    
+      ws.onmessage = function (event) {
+        if (event.data === "pong") {
+          console.log("🔁 Received pong from server");
+          return;
+        }
+    
+        console.log(startLocation, endLocation);
+        const taxis = JSON.parse(event.data);
+        const filteredTaxi = taxis.filter(t => t.plate_number === targetPlate);
+        if (filteredTaxi.length === 0) return;
+    
+        const taxiData = filteredTaxi[0];
+    
+        if (taxiData.passenger_in_danger) {
+          alertblinker("The ride ended in an expected place. Please pull over and wait for investigation. Soon the car would automatically shut down.!");
+        }
+    
+        if (taxiData.on_trip_status === "trip just ended") {
+          console.log("The trip just ended, now rating the trip");
+          endPin.setAttribute("draggable", "true");
+          const endtime = Date.now();
+          rate_trip(starttime, distance, endtime, latestTaxiLngLat, currentTaxiLocation, anomalyCounts);
+          setTimeout(() => {
+            clearRouteAndEndMarker();
+            updateCurrentRide("end");
+          }, 5000);
+        }
+    
+        alertlistener(taxiData);
+    
+        if (taxiData.metrics && Object.keys(taxiData.metrics).length > 0) {
+          updateUIMetrics(taxiData.metrics);
+          if (taxiData.metrics.anomaly) {
+            console.log("🚨 Anomaly detected:", taxiData.metrics.anomaly.type);
+            addAnomalyMarker(taxiData.metrics, taxiData);
+          }
+        }
+    
+        filteredTaxi.forEach(taxi => {
+          const newPosition = { lat: taxi.current_lat, lng: taxi.current_lon };
+          currentTaxiLocation = newPosition;
+          console.log('Current taxi location:', newPosition);
+    
+          if (!taxiMarkers[taxi.plate_number]) {
+            const marker = new mapboxgl.Marker({ element: createTaxiMarker(taxi) })
+              .setLngLat([newPosition.lng, newPosition.lat])
+              .addTo(map);
+    
+            marker.getElement().addEventListener('click', e => {
+              e.stopPropagation();
+              toggleRoute(taxi);
+            });
+    
+            taxiMarkers[taxi.plate_number] = marker;
+            previousPosition[taxi.plate_number] = newPosition;
+          } else {
+            const marker = taxiMarkers[taxi.plate_number];
+            const startPos = previousPosition[taxi.plate_number] || newPosition;
+    
+            // smoothly animate from last pos to new pos
+            animateMarker(marker, startPos, newPosition, 1000);
+            previousPosition[taxi.plate_number] = newPosition;
+    
+            taxiheading = taxi.heading;
+            // Animate camera if enabled
+            if (document.getElementById("easeToToggle").checked) {
+              map.easeTo({
+                center: [newPosition.lng, newPosition.lat],
+                zoom: 19,
+                pitch: 70,
+                
+
+                bearing: taxiheading,
+                duration: 1000
+              });
+            }
+          }
+    
+          console.log(taxi);
+        });
+      };
+    
+      ws.onclose = function () {
+        console.warn("⚠️ WebSocket disconnected. Reconnecting in 3 seconds...");
+        clearInterval(pingInterval);
+        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+      };
+    
+      ws.onerror = function (err) {
+        console.error("❌ WebSocket error:", err);
+        ws.close();
+      };
+    }
+    
+    // Kick it off
+    connectWebSocket();
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    function showTripDetails(retries = 5, delay = 300) {
+      const trip_name = startLocation + ' to ' + endLocation;
+      console.log("trip name: ", trip_name);
+      const tripName = encodeURIComponent(trip_name);
+      endPin.setAttribute("draggable", "true");
+      function attemptFetch(tryCount) {
+        fetch(`/trips/${tripName}/details/`)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Trip not available yet");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const content = `
+              <p><strong>🚖 Trip Name:</strong> ${data.trip_name}</p>
+              
+              <p><strong>🕐 Start Time:</strong> ${data.start_time}</p>
+              <p><strong>🏁 Finish Time:</strong> ${data.finish_time}</p>
+              <p><strong>📍 Distance:</strong> ${data.distance} km</p>
+              <p><strong>⏱️ Duration:</strong> ${data.duration} mins</p>
+              <p><strong>🌟 Actual Rating:</strong> ${data.rating.toFixed(2)} / 10</p>
+            `;
+            document.getElementById("trip-details-content").innerHTML = content;
+            new bootstrap.Modal(document.getElementById("tripDetailModal")).show();
+          })
+          .catch((err) => {
+            if (tryCount > 0) {
+              console.warn(`🔄 Retrying... (${retries - tryCount + 1})`);
+              setTimeout(() => attemptFetch(tryCount - 1), delay);
+            } else {
+              console.error("❌ Failed to load trip details after retries.");
+              alert("Could not load trip details. Please try again later.");
+            }
+          });
+      }
+    
+      attemptFetch(retries);
+    }
+    
+
+
+
+
+
+  function updateUIMetrics(metrics) {
+    // Update taxi metrics
+    document.getElementById("taxiSpeed").innerText = `Speed: ${metrics.speed.toFixed(1)} km/h`;
+    document.getElementById("taxiAccel").innerText = `Accel: ${metrics.acceleration.toFixed(2)} m/s²`;
+    
+    const distance = metrics.route_deviation_distance;
+    const color = distance > 500 ? 'red' : 'inherit'; // 
+    document.getElementById("safe-zone").style.color = color;
+    document.getElementById("safe-zone").innerText = `${metrics.route_deviation_distance ? metrics.route_deviation_distance.toFixed(1) : '0.0'} meters`;
+    
+    /*if (metrics.anomaly.type!== null && metrics.anomaly.type !== undefined) {
+      document.getElementById("anomalyStatus").innerText = `Anomaly: ${metrics.anomaly.type}`;
+    } */
+    // Value maps
+    const roadTypeMap = ["Highway", "City", "Rural"];
+    const roadConditionMap = ["Dry", "Wet", "Snow", "Ice"];
+    const timeOfDayMap = ["Night", "Morning", "Afternoon", "Evening"];
+    const trafficConditionMap = ["Light", "Moderate", "Heavy"];
+
+    document.getElementById("taxiHeading").innerText = `Heading: ${metrics.heading}°`;
+    document.getElementById("taxiYawRate").innerText = `Yaw Rate: ${metrics.yaw_rate.toFixed(2)} °/s`;
+    document.getElementById("taxiSteeringAngle").innerText = `Steering Angle: ${metrics.steering_angle.toFixed(1)}°`;
+    document.getElementById("taxiJerk").innerText = `Jerk: ${metrics.jerk.toFixed(2)} m/s³`;
+    document.getElementById("taxiRoadType").innerText = `Road Type: ${roadTypeMap[metrics.road_type]}`;
+    document.getElementById("taxiTrafficCondition").innerText = `Traffic Condition: ${trafficConditionMap[metrics.traffic_condition]}`;
+    document.getElementById("taxiRoadCondition").innerText = `Road Condition: ${roadConditionMap[metrics.road_condition]}`;
+    document.getElementById("taxiTimeOfDay").innerText = `Time of Day: ${timeOfDayMap[metrics.time_of_day]}`;
+
+  }
+
+  function createTaxiMarker(taxi) {
+    const img = document.createElement("img");
+    img.src = "/static/taxi.png"; 
+    img.style.width = "50px";
+    img.style.height = "50px";
+    img.style.cursor = "pointer";
+    img.title = `Taxi: ${taxi.plate_number}`;
+    img.dataset.driverName = taxi.driver_name;  // Store driver name in the marker element
+
+    return img;
+}
+function addAnomalyMarker(anomalyData, taxiData) {
+  //console.log('Adding anomaly marker...');
+  const timestamp = new Date().toISOString();
+  const markerId = `${taxiData.plate_number}-${timestamp}`;
+  
+  // Create anomaly marker element
+  const el = document.createElement('div');
+  el.className = 'anomaly-marker';
+  el.title = `Anomaly: ${anomalyData.anomaly.type}`;
+  //console.log("anomaly type in the function title: ", el.title);
+  //console.log("anomaly type in the function: ", anomalyData.anomaly.type);
+
+  
+  // Create anomaly marker
+  const marker = new mapboxgl.Marker({ element: el })
+    .setLngLat([taxiData.current_lon, taxiData.current_lat])
+    .addTo(map);
+  
+  //console.log('Marker added to map:', marker);
+  
+  // Add popup with anomaly details
+  const popup = new mapboxgl.Popup({ className: 'anomaly-popup' })
+    .setHTML(`
+      <div>
+        <div class="anomaly-type">${anomalyData.anomaly.type}</div>
+        <div class="anomaly-details">
+          
+          <div class="anomaly-detail-item"><strong>Speed:</strong> ${anomalyData.speed.toFixed(1)} km/h</div>
+
+
+          <div class="anomaly-detail-item"><strong>Acceleration:</strong> ${anomalyData.acceleration.toFixed(2)} m/s²</div>
+          <div class="anomaly-detail-item"><strong>Heading:</strong> ${anomalyData.heading.toFixed(0)}°</div>
+          <div class="anomaly-detail-item"><strong>Yaw Rate:</strong> ${anomalyData.yaw_rate.toFixed(2)} °/s</div>
+          <div class="anomaly-detail-item"><strong>Steering Angle:</strong> ${anomalyData.steering_angle.toFixed(1)}°</div>
+          <div class="anomaly-detail-item"><strong>Jerk:</strong> ${anomalyData.jerk.toFixed(2)} m/s³</div>
+          <div class="anomaly-detail-item"><strong>Road Type:</strong> ${anomalyData.road_type}</div>
+          <div class="anomaly-detail-item"><strong>Traffic Condition:</strong> ${anomalyData.traffic_condition}</div>
+          <div class="anomaly-detail-item"><strong>Road Condition:</strong> ${anomalyData.road_condition}</div>
+          <div class="anomaly-detail-item"><strong>Time of Day:</strong> ${anomalyData.time_of_day}</div>
+          <div class="anomaly-detail-item"><strong>Speed Limit:</strong> ${anomalyData.speed_limit}</div>
+        </div>
+      </div>
+    `);
+  
+  marker.setPopup(popup);
+  
+  //console.log('Popup added to marker:', popup);
+  
+  // Store anomaly marker
+  anomalyMarkers[markerId] = marker;
+  
+  //console.log('Anomaly marker stored:', anomalyMarkers);
+  
+  // Add debugging statement to check if marker is visible
+  //console.log('Marker visible:', marker.isVisible());
+  
+  // Add debugging statement to check if marker is on the map
+  //console.log('Marker on map:', map.hasLayer(marker));
+
+}
+
+
+
+
+    // Initialize WebSocket connection for taxi data
+    function initWebSocket() {
+      const ws = new WebSocket('ws://127.0.0.1:8000/ws/taxi/updates/');
+      
+      ws.onopen = function() {
+        console.log('WebSocket connection established');
+        //generateDataset(routeGeoJSON);
+        
+        rideStatus.textContent = 'Status: Connected to server';
+        rideStatus.style.backgroundColor = '#e8f5e9';
+      };
+      
+      
+      
+      
+
+      
+
+
+
+
+      ws.onclose = function() {
+        console.log('WebSocket connection closed');
+        rideStatus.textContent = 'Status: Disconnected';
+        rideStatus.style.backgroundColor = '#ffebee';
+        
+        // Try to reconnect after a delay
+        setTimeout(function() {
+          if (rideActive) {
+            initWebSocket();
+          }
+        }, 3000);
+      };
+      
+      ws.onerror = function(error) {
+        console.error('WebSocket error:', error);
+      };
+      
+      return ws;
+    }
+    function alertlistener(taxi) {
+
+      const list = document.getElementById("anomaly-list");
+      // 🚫 Cleanup step: clear all existing anomalies if the trip just ended
+      if (taxi.on_trip_status === "trip just ended") {
+        const alerts = list.querySelectorAll(`li[id^="${taxi.plate_number}-"]`);
+        alerts.forEach(alert => alert.remove());
+        return; // Skip further processing
+      }
+
+
+      if (taxi.metrics && taxi.metrics.anomaly && taxi.metrics.anomaly.type && taxi.on_trip_status === "on ride") {
+          //console.log("car on move the anomaly listener listening")
+          const rawTypes = taxi.metrics.anomaly.type;
+          
+          // Split and trim anomaly types
+          const types = rawTypes.split(",").map(t => t.trim());
+
+
+          types.forEach(type => {
+              // Update global count
+              anomalyCounts[type] = (anomalyCounts[type] || 0) + 1;
+
+              // Create a unique alert entry
+              const alertId = `${taxi.plate_number}-${type}-${Date.now()}`;
+              const li = document.createElement("li");
+              li.setAttribute("id", alertId);
+              li.style.marginBottom = "10px";
+
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.style.marginRight = "10px";
+              checkbox.addEventListener("change", () => {
+                  document.getElementById(alertId).remove();
+              });
+
+              const label = document.createElement("label");
+              label.textContent = `🚨 [${taxi.plate_number}] ${type.toUpperCase()} (Total: ${anomalyCounts[type]})`;
+
+              li.appendChild(checkbox);
+              li.appendChild(label);
+              list.appendChild(li);
+          });
+      }
+  }
+
+    // Update taxi position on the map
+    function updateTaxiPosition(taxiData) {
+      // Update taxi marker
+      const lngLat = {
+        lng: taxiData.current_lon,
+        lat: taxiData.current_lat
+      };
+      
+      if (!taxiMarker) {
+        // Create taxi marker element
+        const el = document.createElement('div');
+        el.className = 'taxi-marker';
+        el.style.width = '25px';
+        el.style.height = '25px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#ffeb3b';
+        el.style.border = '2px solid #000';
+        el.style.display = 'flex';
+        el.style.justifyContent = 'center';
+        el.style.alignItems = 'center';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '14px';
+        el.textContent = '🚕';
+        
+        // Add taxi marker to map
+        taxiMarker = new mapboxgl.Marker(el)
+          .setLngLat(lngLat)
+          .addTo(map);
+      } else {
+        // Update taxi marker position
+        taxiMarker.setLngLat(lngLat);
+      }
+      
+      // Update metrics display
+      if (taxiData.speed !== undefined) {
+        taxiSpeed.textContent = `Speed: ${taxiData.speed.toFixed(1)} km/h`;
+        // Highlight if speeding
+        if (taxiData.speed > taxiData.speed_limit) {
+          taxiSpeed.classList.add('anomaly-alert');
+        } else {
+          taxiSpeed.classList.remove('anomaly-alert');
+        }
+      }
+      
+      if (taxiData.acceleration !== undefined) {
+        taxiAccel.textContent = `Accel: ${taxiData.acceleration.toFixed(2)} m/s²`;
+        // Highlight if harsh acceleration
+        if (Math.abs(taxiData.acceleration) > 3) {
+          taxiAccel.classList.add('anomaly-alert');
+        } else {
+          taxiAccel.classList.remove('anomaly-alert');
+        }
+      }
+      
+      // Update anomaly status
+      if (taxiData.anomaly) {
+        anomalyStatus.textContent = `Anomaly: ${taxiData.anomaly.type}`;
+        anomalyStatus.classList.add('anomaly-alert');
+      } else {
+        anomalyStatus.textContent = 'Anomaly: None';
+        anomalyStatus.classList.remove('anomaly-alert');
+      }
+    }
+
+    console.log(startLocation, endLocation);
+    // Handle start ride button click
+
+    startRideBtn.addEventListener('click', function() {
+
+
+
+      starttime =null;
+      starttime = new Date().getTime();
+      endPin.setAttribute("draggable", "false");
+      if (deviationPin) deviationPin.setAttribute("draggable", "false");
+
+      
+      if (!endMarker && !deviationMarker) {
+        alert('Please set either end point or deviation point first!');
+        return;
+      }
+
+      
+      
+
+
+
+
+
+      const anomalyPercentage = parseFloat(document.getElementById("anomalyPercentage").value);
+
+      simTerminal(targetPlate,"start");
+      
+      //const routeToUse = isDeviationEnabled && deviationMarker ? 
+      updateCurrentRide("start");
+      //console.log("ride clicked");
+      console.log("anomaly percentage: ", anomalyPercentage);
+
+      // document.getElementById('deviationRouteLayer').source : routeGeoJSON;
+  
+
+      generateDataset(routeGeoJSON, anomalyPercentage);
+      
+      rideActive = true;
+      startRideBtn.disabled = true;
+      endRideBtn.disabled = false;
+      rideStatus.textContent = 'Status: Ride in progress';
+      rideStatus.style.backgroundColor = '#e8f5e9';
+      
+      // Initialize WebSocket if not already connected
+      if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+        wsConnection = initWebSocket();
+      }
+      
+      // Dispatch a custom event that the Python simulator can listen for
+      const event = new CustomEvent('rideStarted', {
+        detail: {
+          startPoint: startMarker.getLngLat(),
+          endPoint: endMarker.getLngLat(),
+          route: routeCoordinates
+        }
+      });
+      window.dispatchEvent(event);
+      
+      // Notify parent window or iframe container about ride start
+      window.parent.postMessage({
+        action: 'startRide',
+        startPoint: startMarker.getLngLat(),
+        endPoint: endMarker.getLngLat(),
+        route: routeCoordinates
+      }, '*');
+    });
+
+    function simTerminal(selectedPlateNumber,status){
+      setTimeout(() => {
+        fetch('/start-simulation/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            'plate_number': selectedPlateNumber,
+            'data_file': 'new_simulated_data.csv', 
+            'trip_status': status
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          console.log(data.message || "Simulation triggered.");
+        })
+        .catch(err => console.error("Simulation trigger failed:", err));
+      }, 5000);
+    }
+
+
+    
+    
+
+    endRideBtn.addEventListener('click', function() {
+      updateCurrentRide("end");
+      simTerminal(targetPlate,"end");
+
+      endRideBtn.disabled = true;
+      startRideBtn.disabled = true;
+      
+      let endtime =null;
+      rideStatus.textContent = 'Status: Ride ended';
+      rideStatus.style.backgroundColor = '#ffebee';
+      
+      
+      // Remove taxi marker from map
+      if (taxiMarker) {
+        taxiMarker.remove();
+        taxiMarker = null;
+      }
+      
+      // Reset metrics display
+      taxiSpeed.textContent = 'Speed: - km/h';
+      taxiAccel.textContent = 'Accel: - m/s²';
+      anomalyStatus.textContent = 'Anomaly: None';
+      taxiSpeed.classList.remove('anomaly-alert');
+      taxiAccel.classList.remove('anomaly-alert');
+      anomalyStatus.classList.remove('anomaly-alert');
+
+
+      
+      // Notify parent window or iframe container about ride end
+      window.parent.postMessage({
+        action: 'endRide'
+      }, '*');
+    });
+
+    // Reverse geocode using OpenStreetMap's Nominatim API for detailed place info
+    // Reverse geocode using OpenStreetMap's Nominatim API for detailed place info
+    function reverseGeocode(lngLat, type) {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lngLat.lat}&lon=${lngLat.lng}`;
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.address) {
+            const address = data.address;
+            const parts = [
+              address.road,
+              address.suburb,
+              address.city || address.town || address.village,
+              address.state
+            ];
+            
+            const cleanedAddress = parts.filter(Boolean).join(', ');
+            updateLocationLabel(type, cleanedAddress);
+          } else {
+            updateLocationLabel(type, "Unknown location");
+          }
+        })
+        .catch(err => {
+          console.error('Error in reverse geocoding:', err);
+          updateLocationLabel(type, "Error retrieving location");
+        });
+    }
+
+
+
+    
+
+    function updateLocationLabel(type, placeDetails) {
+      if (type === 'start') {
+        document.getElementById('startLocation').textContent = `Starting: ${placeDetails}`;
+        startLocation = placeDetails;
+        
+      } else if (type === 'end') {
+        document.getElementById('endLocation').textContent = `Destination: ${placeDetails}`;
+        endLocation = placeDetails;
+        
+      }
+    }
+
+    function updateCurrentRide(status) {
+      //console.log("currentRide clicked and passed: ", currentRide);
+      if (status == 'start' ){
+
+        currentRide = `${startLocation} to ${endLocation}`;
+        taxi_is_active = 'True';
+
+        const passenger = customerId;
+      // Make an AJAX request to save the currentRide data
+        $.ajax({
+          type: 'POST',
+          url: '{% url 'driver_navigation_dashboard' username=driver %}',
+          data: {
+            'passenger': passenger,
+            'current_ride': currentRide,
+            'taxi_is_active': taxi_is_active,
+            'current_route':JSON.stringify(current_route),
+          
+            
+          },
+          success: function(data) {
+            console.log('Current ride updated successfully to:', currentRide);
+          }
+        });
+      }
+
+      else if (status == 'end') {
+        
+        currentRide = 'No ride selected';
+        taxi_is_active = 'False';
+        current_route = [];
+        endRideBtn.disabled = true;
+        // Make an AJAX request to save the currentRide data
+        $.ajax({
+          type: 'POST',
+          url: '{% url 'driver_navigation_dashboard' username=driver %}',
+          data: {
+            'passenger': 'no customer',
+            'current_ride': currentRide,
+            'taxi_is_active': taxi_is_active,
+            'current_route': JSON.stringify(current_route),
+          },
+          success: function(data) {
+            console.log('Changed back to no ride');
+          }
+        });
+      }
+      
+    }
+
+    // Create a custom marker element that includes a colored circle and label
+    // Update the marker creation function to handle deviation pins
+    function createMarkerElement(type) {
+      const container = document.createElement('div');
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.alignItems = 'center';
+
+      // Create the circle element
+      const circle = document.createElement('div');
+      circle.style.width = '20px';
+      circle.style.height = '20px';
+      circle.style.borderRadius = '50%';
+      
+      // Set color based on type
+      if (type === 'start') {
+        circle.style.backgroundColor = 'green';
+      } else if (type === 'end') {
+        circle.style.backgroundColor = 'red';
+      } else if (type === 'deviation') {
+        circle.style.backgroundColor = '#ff9800'; // Orange for deviation
+      }
+      
+      circle.style.border = '2px solid #fff';
+      circle.style.boxShadow = '0 0 2px rgba(0,0,0,0.5)';
+
+      // Create the label element
+      const label = document.createElement('div');
+      label.textContent = type === 'start' ? 'Start' : (type === 'end' ? 'Destination' : 'Expected Route');
+      label.style.fontSize = '12px';
+      label.style.fontWeight = 'bold';
+      label.style.color = '#000';
+      label.style.marginTop = '2px';
+
+      container.appendChild(circle);
+      container.appendChild(label);
+      return container;
+    }
+
+    function clearRouteAndEndMarker() {
+      // 🧹 Remove end marker if exists
+      if (endMarker) {
+        endMarker.remove();
+        endMarker = null;
+      }
+
+      if (deviationMarker) {
+        deviationMarker.remove();
+        deviationMarker.null;
+      }
+
+    
+      if (map.getLayer(routeLayerId)) {
+        map.removeLayer(routeLayerId);
+      }
+
+      if (map.getLayer(deviationRouteLayerId)){
+        map.removeLayer(deviationRouteLayerId);
+      }
+
+
+
+      // 🧹 Remove route layer if exists
+      if (map.getSource(routeLayerId)) {
+        map.removeSource(routeLayerId);
+      }
+
+      if (map.getSource(deviationRouteLayerId)) {
+        map.removeSource(deviationRouteLayerId);
+      }
+
+
+      
+      
+    
+      console.log("🧹 Cleared route line and end marker.");
+    }
+    
+
+    // Helper function to add or update a marker on the map and perform reverse geocoding
+    function addOrUpdateMarker(type, lngLat) {
+      if (type === 'start') {
+        if (startMarker) {
+          startMarker.setLngLat(lngLat);
+        } else {
+          const markerElement = createMarkerElement(type);
+          startMarker = new mapboxgl.Marker({ element: markerElement, draggable: false }) // non-draggable
+            .setLngLat(lngLat)
+            .addTo(map);
+        }
+        reverseGeocode(lngLat, 'start');
+      } else if (type === 'end') {
+        if (endMarker) {
+          endMarker.setLngLat(lngLat);
+        } else {
+          const markerElement = createMarkerElement(type);
+          endMarker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+            .setLngLat(lngLat)
+            .addTo(map);
+            endMarker.on('dragend', () => {
+              const newLngLat = endMarker.getLngLat();
+              reverseGeocode(newLngLat, 'end');
+            
+              // 🆕 Always reset start marker to latest taxi location
+              if (startMarker) {
+                startMarker.remove();
+                startMarker = null;
+              }
+            
+              latestTaxiLngLat = {
+                lat: currentTaxiLocation.lat,
+                lng: currentTaxiLocation.lng
+              };
+            
+              console.log("📍 Fresh start after drag:", latestTaxiLngLat);
+              addOrUpdateMarker('start', latestTaxiLngLat);
+            
+              updateRoute();
+            });
+            
+        }
+        reverseGeocode(lngLat, 'end');
+      }
+    }
+    
+    
+
+    // Enable drop on the map container
+    const mapContainer = document.getElementById('map');
+    mapContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    mapContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+    
+      const type = e.dataTransfer.getData('text/plain');
+      const rect = mapContainer.getBoundingClientRect();
+      const point = [e.clientX - rect.left, e.clientY - rect.top];
+      const lngLat = map.unproject(point);
+    
+      if (type === 'end') {
+        addOrUpdateMarker('end', lngLat); // Place end marker
+    
+        
+          if (startMarker) {
+            startMarker.remove();
+            startMarker = null;
+          }
+
+          latestTaxiLngLat = {
+            lat: currentTaxiLocation.lat,
+            lng: currentTaxiLocation.lng
+          };
+
+
+          // Add a new start marker using latest taxi location
+          addOrUpdateMarker('start', latestTaxiLngLat);
+
+          // Now calculate the route
+          updateRoute();
+          const checkInterval = 1000; // check every 1 second
+
+          /*const intervalId = setInterval(() => {
+            if (startLocation.trim() !== '' && endLocation.trim() !== '') {
+              startRideBtn.disabled = false;
+              clearInterval(intervalId); // stop checking once both have values
+            }
+          }, checkInterval); */
+
+      
+
+      } else if (type === 'deviation' && isDeviationEnabled) {
+        // Handle deviation pin drop
+        if (deviationMarker) {
+          deviationMarker.remove();
+          deviationMarker = null;
+        }
+    
+        // Create a marker element for deviation point
+        const markerElement = createMarkerElement('deviation');
+        deviationMarker = new mapboxgl.Marker({ element: markerElement, draggable: true })
+          .setLngLat(lngLat)
+          .addTo(map);
+          
+        deviationMarker.on('dragend', () => {
+          const newLngLat = deviationMarker.getLngLat();
+          reverseGeocode(newLngLat, 'deviation');
+          updateDeviationRoute();
+        });
+        
+        reverseGeocode(lngLat, 'deviation');
+        
+        // Start from current taxi position
+        if (startMarker) {
+          startMarker.remove();
+          startMarker = null;
+        }
+        
+        latestTaxiLngLat = {
+          lat: currentTaxiLocation.lat,
+          lng: currentTaxiLocation.lng
+        };
+        
+        addOrUpdateMarker('start', latestTaxiLngLat);
+        
+        // Calculate and draw the deviation route
+        updateDeviationRoute();
+      }
+    });
+
+
+    // Function to update deviation route
+function updateDeviationRoute() {
+  if (!startMarker || !deviationMarker) return;
+  
+  deviationRouteLayerId = 'deviationRouteLayer';
+  
+  // Remove existing deviation route if present
+  if (map.getLayer(deviationRouteLayerId)) {
+    map.removeLayer(deviationRouteLayerId);
+  }
+  if (map.getSource(deviationRouteLayerId)) {
+    map.removeSource(deviationRouteLayerId);
+  }
+  
+  const startLngLat = startMarker.getLngLat();
+  const devLngLat = deviationMarker.getLngLat();
+  
+  // Build OSRM API URL (using driving mode)
+  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLngLat.lng},${startLngLat.lat};${devLngLat.lng},${devLngLat.lat}?overview=full&geometries=geojson`;
+
+  fetch(osrmUrl)
+    .then(response => response.json())
+    .then(data => {
+      if (data.routes && data.routes.length > 0) {
+        const devRouteGeoJSON = data.routes[0].geometry;
+
+        
+        // Save coordinates to taxi.route instead of the main route
+        current_route = devRouteGeoJSON.coordinates;
+        console.log("Deviation route coordinates:", current_route);
+        
+        // Add the route as a new source and layer with different color
+        map.addSource(deviationRouteLayerId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: devRouteGeoJSON
+          }
+        });
+        
+        map.addLayer({
+          id: deviationRouteLayerId,
+          type: 'line',
+          source: deviationRouteLayerId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ff9800', // Orange for deviation route
+            'line-width': 6,
+            'line-opacity': 0.75
+          }
+        });
+        
+        // Calculate distance
+        const distanceInMeters = data.routes[0].distance;
+        const distanceInKilometers = (distanceInMeters / 1000).toFixed(2);
+        
+        // Using this route for the taxi instead of the normal route
+        console.log("Using deviation route for taxi.route");
+        startRideBtn.disabled = false;
+      }
+    })
+    .catch(err => console.error('Error fetching deviation route:', err));
+}
+
+// Update the reverseGeocode function to handle deviation locations
+  function updateLocationLabel(type, placeDetails) {
+    if (type === 'start') {
+      document.getElementById('startLocation').textContent = `Starting: ${placeDetails}`;
+      startLocation = placeDetails;
+    } else if (type === 'end') {
+      document.getElementById('endLocation').textContent = `Destination: ${placeDetails}`;
+      endLocation = placeDetails;
+    } else if (type === 'deviation') {
+      document.getElementById('deviationLocation').textContent = `Deviation: ${placeDetails}`;
+    }
+  }
+    
+    
+    
+    // Add dragstart listeners to sidebar pins to set the dataTransfer type
+    
+    document.getElementById('endPin').addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', 'end');
+    });
+
+    // Function to fetch and display route from OSRM when both markers exist
+    function updateRoute() {
+      // Remove any existing route layer
+      if (map.getLayer(routeLayerId)) {
+        map.removeLayer(routeLayerId);
+      }
+      if (map.getSource(routeLayerId)) {
+        map.removeSource(routeLayerId);
+      }
+
+      // Only proceed if both markers are set
+      
+
+      const startLngLat = startMarker.getLngLat();
+      console.log("startLngLat: ", startLngLat);
+      const endLngLat = endMarker.getLngLat();
+
+      // Build OSRM API URL (using driving mode)
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLngLat.lng},${startLngLat.lat};${endLngLat.lng},${endLngLat.lat}?overview=full&geometries=geojson`;
+
+      fetch(osrmUrl)
+        .then(response => response.json())
+        .then(data => {
+          if (data.routes && data.routes.length > 0) {
+            routeGeoJSON = data.routes[0].geometry;
+
+            current_route=routeGeoJSON.coordinates;
+            
+            // Savings route coordinates for later use
+            routeCoordinates = routeGeoJSON.coordinates;
+            console.log("The route coordinates---------------------------------------------------: ")
+            console.log(routeCoordinates)
+            // Add the route as a new source and layer
+            map.addSource(routeLayerId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: routeGeoJSON
+              }
+            });
+            
+            map.addLayer({
+              id: routeLayerId,
+              type: 'line',
+              source: routeLayerId,
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+              },
+              paint: {
+                'line-color': '#3887be',
+                'line-width': 9,
+                'line-opacity': 0.95
+              }
+            });
+            
+            // Optionally adjust map view to fit the route
+            const bounds = routeCoordinates.reduce(function(bounds, coord) {
+              return bounds.extend(coord);
+            }, new mapboxgl.LngLatBounds(routeCoordinates[0], routeCoordinates[0]));
+            
+            map.fitBounds(bounds, { padding: 50 });
+            const distanceInMeters = data.routes[0].distance; // Distance is in meters
+            const distanceInKilometers = (distanceInMeters / 1000).toFixed(2); // Convert to kilometers
+
+            distance=distanceInKilometers;
+            // Optionally display the distance on the map or in a UI element
+            console.log(`Total route distance: ${distanceInKilometers} km`);
+
+            document.getElementById('distanceDisplay').innerText = `Distance: ${distanceInKilometers} km`;
+            
+            // Enable start ride button once route is calculated
+            
+          } else {
+            alert('No route found!');
+          }
+        })
+        .catch(err => console.error('Error fetching route:', err));
+
+
+        startRideBtn.disabled = false;
+    }
+    function generateDataset(routeGeoJSON, anomaly_ratio) {
+      fetch('/generate-dataset/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ route: routeGeoJSON, output_file: "new_simulated_data.csv", anomaly_ratio: anomaly_ratio })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          alert("Error: " + data.error);
+        } else {
+          alert("Success: " + data.message + "\nFile: " + data.output_file);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Error sending request.");
+      });
+    }
+    function rate_trip(start_time=1, distance=1,finish_time=0, start_loc=0, end_loc=0, anomalyCounts=[]) {
+
+      
+      fetch('/rate-trip/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          trip_name: startLocation + ' to ' + endLocation,
+          customerId: customerId,
+          driver_name: driver,
+          plate_number: targetPlate,
+          start_time: start_time,
+          finish_time: finish_time,
+          distance: distance,
+          
+          start_loc: start_loc,
+          end_loc: end_loc,
+          anomalyCounts: anomalyCounts
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          alert("Error: " + data.error);
+        } else {
+          alert("Success: " + data.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Error sending request.");
+      });
+
+      showTripDetails();
+
+    }
+    
+    // Listen for messages from parent window (used for integration with simulator)
+    window.addEventListener('message', function(event) {
+      const data = event.data;
+      
+      if (data.action === 'taxiUpdate' && rideActive) {
+        updateTaxiPosition(data.taxiData);
+      }
+    });
+
+    // Initialize WebSocket connection when map is loaded
+    map.on('load', function() {
+      // Listen for window messages from simulator script
+      window.addEventListener('simulatorData', function(e) {
+        if (rideActive) {
+          updateTaxiPosition(e.detail);
+        }
+      });
+    });
+
+
+    
+  </script>
+</body>
+</html>

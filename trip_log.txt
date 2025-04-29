@@ -1,0 +1,70 @@
+Date: 2025-04-21 14:00
+From: Almaty 23
+To: Almaty 68
+Duration: 4 mins
+Anomalies: 3 total (1 sharp turn, 2 speeding)
+Rating: 6/10
+
+Date: 2025-04-21 09:30
+From: Almaty 5
+To: Almaty 40
+Duration: 8 mins
+Anomalies: 2 total (2 harsh brakes)
+Rating: 7/10
+
+Date: 2025-04-21 10:15
+From: Almaty 12
+To: Almaty 99
+Duration: 12 mins
+Anomalies: 4 total (2 speeding, 1 lane departure, 1 sharp turn)
+Rating: 5/10
+
+Date: 2025-04-21 11:45
+From: Almaty 78
+To: Almaty 31
+Duration: 7 mins
+Anomalies: 1 total (1 harsh brake)
+Rating: 8/10
+
+Date: 2025-04-21 13:00
+From: Almaty 50
+To: Almaty 75
+Duration: 5 mins
+Anomalies: 3 total (1 speeding, 2 sharp turns)
+Rating: 6/10
+
+Date: 2025-04-21 15:20
+From: Almaty 22
+To: Almaty 19
+Duration: 6 mins
+Anomalies: 0
+Rating: 9/10
+
+Date: 2025-04-21 16:10
+From: Almaty 33
+To: Almaty 88
+Duration: 10 mins
+Anomalies: 2 total (2 speeding)
+Rating: 7/10
+
+Date: 2025-04-21 17:45
+From: Almaty 14
+To: Almaty 39
+Duration: 9 mins
+Anomalies: 5 total (2 harsh brakes, 1 lane departure, 2 sharp turns)
+Rating: 4/10
+
+Date: 2025-04-21 18:30
+From: Almaty 60
+To: Almaty 2
+Duration: 11 mins
+Anomalies: 3 total (3 speeding)
+Rating: 5/10
+
+Date: 2025-04-21 19:10
+From: Almaty 47
+To: Almaty 10
+Duration: 6 mins
+Anomalies: 1 total (1 lane departure)
+Rating: 8/10
+

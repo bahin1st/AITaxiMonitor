@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxi Tracking</title>
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.css" rel="stylesheet" />
+    <!-- @mapbox-controls/styles CSS -->
+    <link href="https://unpkg.com/@mapbox-controls/styles@latest/dist/styles.css" rel="stylesheet" />
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  
+
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif;
+        }
+        #map { 
+            width: 100vw; 
+            height: 100vh; 
+        }
+        #search-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        #search-container input {
+            padding: 8px;
+            font-size: 16px;
+            width: 300px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .mapboxgl-ctrl-scale {
+            max-width: 100px !important;      
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            padding: 4px;  
+            color: #fff !important; 
+            
+            font-size: 12px;/* add a little breathing room */
+        }
+
+        
+        .mapboxgl-ctrl-scale .mapboxgl-ctrl-scale-line,
+        .mapboxgl-ctrl-scale .mapboxgl-ctrl-scale-text {
+            font-size: 2rem;
+            color: #fff !important;
+            font-weight: 700;  
+        }
+
+        .mapboxgl-ctrl-scale .mapboxgl-ctrl-scale-line {
+            border-top: 2px solid #fff !important;
+        }
+        
+        .anomaly-marker {
+            border-radius: 50%;       
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        
+    </style>
+</head>
+<body>
+    <!-- Blue Menu Bar -->
+    <div id="top-menu" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    background-color: #007BFF;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+">
+
+    <!-- Left section: Title and Menu -->
+    <div style="display: flex; align-items: center;">
+        <h2 style="margin: 0 30px 0 0;">Admin Dashboard</h2>
+        
+       
+    </div>
+
+    <div class="controls">
+        
+        <input type="checkbox" id="show-anomaly-sidebar">
+        <label for="show-anomaly-sidebar">Anomaly sidebar</label>
+
+        <input type="checkbox" id="show-critical-alert-sidebar">
+        <label for="show-critical-alert-sidebar">Critical alert sidebar</label>
+        
+    </div>
+    <div class="dropdown">
+        <button
+          class="btn btn-secondary dropdown-toggle"
+          type="button"
+          id="styleDropdown"
+          data-bs-toggle="dropdown"
+          aria-expanded="false">
+          Map Style
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="styleDropdown">
+          <li><a class="dropdown-item" href="#" data-style="mapbox://styles/mapbox/streets-v11">Streets</a></li>
+          <li><a class="dropdown-item" href="#" data-style="mapbox://styles/mapbox/satellite-v9">Satellite</a></li>
+          <li><a class="dropdown-item" href="#" data-style="mapbox://styles/bahin/cm9trj70q000u01sh4tvga1g7">Custom</a></li>
+        </ul>
+      </div>
+
+    <!-- Right section: Search box -->
+    <div>
+        <input type="text" id="plateNumberSearch" placeholder="Enter Taxi Plate Number" style="
+            width: 200px;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            outline: none;
+        ">
+    </div>
+
+    <label for="filter-mode">Filter mode:</label>
+    <select id="filter-mode">
+    <option value="display">Display only</option>
+    <option value="strict">Strict filtering</option>
+    </select>
+
+
+    <label for="taxi-filter">Filter:</label>
+
+    
+    <select id="taxi-filter">
+    <option value="all">All taxis</option>
+    <option value="on_trip">On trip</option>
+    <option value="not_on_trip">Not on trip</option>
+    <option value="danger">Passenger in danger</option>
+    </select>
+
+</div>
+
+    <!-- Anomaly Sidebar -->
+    <div id="anomaly-sidebar" style="
+    position: absolute;
+    top: 150px;
+    right: 20px;
+    width: 300px;
+    background: #fff;
+    border-left: 5px solid #e53935;
+    border-radius: 12px;
+    padding: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+">
+        <h4 style="
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 20px;
+        color: #e53935;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">Anomaly Alerts</h4>
+        <ul id="anomaly-list" style="list-style: none; padding: 0;"></ul>
+    </div>
+    <div id="critical-alerts-sidebar" style="
+    position: absolute;
+    top: 150px;
+    left: 20px;
+    width: 300px;
+    background: #fff;
+    border-left: 5px solid #e53935;
+    border-radius: 12px;
+    padding: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+">
+    <h3 style="
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 20px;
+        color: #e53935;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        🚨 Critical Alerts
+    </h3>
+    <ul id="alert-list" style="
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    "></ul>
+</div>
+
+
+    <!-- Search Container -->
+   
+    <!-- Map -->
+   <!-- Bootstrap Modal (put at bottom of HTML body) -->
+    <div class="modal fade" id="driverModal" tabindex="-1" aria-labelledby="driverModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+        <div class="modal-content rounded-4 shadow">
+            <div class="modal-header">
+            <h5 class="modal-title" id="driverModalLabel">Driver Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="driverModalBody">
+            <!-- JS Injected -->
+            </div>
+        </div>
+        </div>
+    </div>
+    
+      
+  
+    <div id="map" style="height: calc(100vh - 80px); margin-top: 80px;"></div>
+
+
+    <!-- Modal -->
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.js"></script>
+    <!-- @mapbox-controls/styles UMD bundle -->
+    <script src="https://unpkg.com/@mapbox-controls/styles@latest/dist/styles.umd.js"></script>
+    <!-- Bootstrap JS bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
+    <script>
+        // 1) configuring the token
+        mapboxgl.accessToken = "{{mapboxApiKey}}";
+
+        // 2) init map
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style:      'mapbox://styles/bahin/cm9trj70q000u01sh4tvga1g7',
+            center:     [76.889709, 43.238949],
+            zoom:       12
+        });
+
+        map.on('load', () => {
+            // 3) zoom + compass
+            map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+            // 4) fullscreen button
+            map.addControl(new mapboxgl.FullscreenControl(),    'bottom-right');
+
+            // 5) scale bar
+            map.addControl(new mapboxgl.ScaleControl({ maxWidth: 200, unit: 'metric', background: 'black' }), 'top-right');
+
+        
+            
+        });
+        // after map.on('load', ...)
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+        dropdownItems.forEach(item => {
+        item.addEventListener('click', e => {
+            e.preventDefault();
+            const styleUrl = item.getAttribute('data-style');
+            // Update button text
+            document.getElementById('styleDropdown').textContent = item.textContent;
+            // Switch map style
+            map.setStyle(styleUrl);
+        });
+        });
+
+          /////////////////////////////////////////////////////// Interactivity JS///////////////////////////////////
+
+        
+          let feature;
+
+          map.addInteraction("Click-handler", {
+          type: "click",
+          target: {
+              "featuresetId": "buildings",
+              "importId": "basemap"
+          },
+          handler: (e) => {
+              if (feature) {
+                  map.setFeatureState(feature, { ["select"]: false });
+              feature = null;
+              } else {
+              map.setFeatureState(e.feature, { ["select"]: true });
+              feature = e.feature;
+              }
+          }
+          });
+      
+  
+  
+  
+          
+  
+  
+  
+  
+  
+  
+  
+  
+          /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
+  
+  
+
+
+
+        document.getElementById("show-anomaly-sidebar").addEventListener("change", function() {
+            const anomalySidebar = document.getElementById("anomaly-sidebar");
+            anomalySidebar.style.display = this.checked ? "block" : "none";
+
+        })
+
+        document.getElementById("show-critical-alert-sidebar").addEventListener("change", function() {
+            const criticalAlertSidebar = document.getElementById("critical-alerts-sidebar");
+            criticalAlertSidebar.style.display = this.checked ? "block" : "none";
+        })
+
+
+
+
+
+
+      
+
+
+
+
+        // Variables
+
+
+
+        let taxiMarkers = {};  
+        let currentRouteId = null; 
+
+        let currentAnomalyMarkers = [];
+        let anomalyCounts = {};
+        
+
+        // ------ ICON MAPPING ------
+        const ANOMALY_ICONS = {
+            speeding:    '/static/icons/speeding.png',
+            sudden_break: '/static/icons/suddenbrake.png',
+            route_deviation:   '/static/icons/routedeviation.png',
+            sudden_stop:        '/static/icons/suddenstop.png',
+            sudden_acceleration: '/static/icons/suddenacceleration.png',
+            sudden_turn: '/static/icons/suddenturn.png',
+            tight_turn: '/static/icons/tightturn.png',
+            default:     '/static/icons/profile.png'
+        };
+  
+
+        function toggleRoute(taxi) {
+            const routeId = `route-${taxi.plate_number}`;
+        
+            // Remove existing route and markers
+            if (currentRouteId && currentRouteId !== routeId) {
+                removeRoute(currentRouteId);
+                removeAnomalyMarkers();
+            }
+        
+            if (currentRouteId === routeId) {
+                removeRoute(routeId);
+                removeAnomalyMarkers();
+                currentRouteId = null;
+                return;
+            }
+        
+            // Anomalies structure fallback
+            const anomalies = taxi.anomalies || { daily: {}, monthly: {}, yearly: {} };
+        
+            function formatAnomalyData(data) {
+                return Object.entries(data)
+                    .map(([type, count]) => `<li>${type}: ${count}</li>`)
+                    .join("") || "<li>None</li>";
+            }
+        
+            // ✅ Render the Bootstrap modal instead of mapboxgl.Popup
+            const content = `
+              <div class="row">
+                <div class="col-md-4 text-center">
+                  <img src="${taxi.driver_image_url || '/static/profile_pictures/profile.png'}" alt="Driver Image"
+                    class="img-fluid rounded-circle mb-3 border"
+                    style="width: 150px; height: 150px; object-fit: cover;">
+                  <p class="fw-bold">${taxi.driver_name}</p>
+                  <a href="/driver_details/${taxi.driver_name}" target="_blank" class="btn btn-outline-primary btn-sm">
+                    View details
+                  </a>
+                  
+                </div>
+                <div class="col-md-8">
+                  <p><strong>Is on ride:</strong> ${taxi.current_status}</p>
+                  <p><strong>Is passenger in denger? :</strong> ${taxi.passenger_in_danger}</p>
+                  <p><strong>Plate:</strong> ${taxi.plate_number}</p>
+                  <hr>
+                  <p><strong>Anomalies (Today):</strong></p>
+                  <ul>${formatAnomalyData(anomalies.daily)}</ul>
+                  <p><strong>Anomalies (Month):</strong></p>
+                  <ul>${formatAnomalyData(anomalies.monthly)}</ul>
+                  <p><strong>Anomalies (Year):</strong></p>
+                  <ul>${formatAnomalyData(anomalies.yearly)}</ul>
+                </div>
+              </div>
+            `;
+        
+            document.getElementById('driverModalBody').innerHTML = content;
+            const modal = new bootstrap.Modal(document.getElementById('driverModal'));
+            modal.show();
+        
+            // Add route line
+            if (taxi.route && taxi.route.length > 0) {
+                addRoute(routeId, taxi.route);
+                currentRouteId = routeId;
+            }
+        
+            // Fetch and plot ride anomalies
+            if (taxi.current_ride_name !== "unknown" && taxi.current_ride_name.trim() !== "No ride selected") {
+                console.log("Fetching anomalies for ride:", taxi.current_ride_name);
+                fetch(`/api/anomalies/${encodeURIComponent(taxi.current_ride_name)}/`)
+                    .then(response => response.json())
+                    .then(anomalies => {
+                        anomalies.forEach(anomaly => {
+                            // 1️⃣ pick the right icon (fall back to ‘default’)
+                            const iconUrl = ANOMALY_ICONS[anomaly.type] || ANOMALY_ICONS.default;
+                          
+                            // 2️⃣ build a custom DOM element for the marker
+                            const el = document.createElement('div');
+                            el.className = 'anomaly-marker';
+                            el.style.backgroundImage = `url(${iconUrl})`;
+                            el.style.width  = '32px';
+                            el.style.height = '32px';
+                            el.style.backgroundSize = 'contain';
+                            el.style.cursor = 'pointer';
+                          
+                            // 3️⃣ drop it on the map
+                            const marker = new mapboxgl.Marker({ element: el, draggable: false })
+                              .setLngLat([anomaly.long, anomaly.lat])
+                              .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                                  <strong>${anomaly.type}</strong><br>
+                                  ${new Date(anomaly.timestamp).toLocaleString()}<br>
+                                  <strong>Location:</strong> ${anomaly.lat.toFixed(5)}, ${anomaly.long.toFixed(5)}<hr>
+                                  <strong>Metrics:</strong><pre>${JSON.stringify(anomaly.metrics, null, 2)}</pre>
+                              `))
+                              .addTo(map);
+                          
+                            currentAnomalyMarkers.push(marker);
+                          });
+                          
+                    })
+                    .catch(err => console.error("Error fetching ride anomalies:", err));
+            } else {
+                console.log("No anomalies for ride:", taxi.current_ride_name);
+            }
+        }
+        
+
+        function removeAnomalyMarkers() {
+            currentAnomalyMarkers.forEach(marker => marker.remove());
+            currentAnomalyMarkers = [];
+        }
+
+        
+
+        function addRoute(routeId, coordinates) {
+            if (!map.getSource(routeId)) {
+                map.addSource(routeId, {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: coordinates
+                        }
+                    }
+                });
+
+                map.addLayer({
+                    id: routeId,
+                    type: 'line',
+                    source: routeId,
+                    paint: {
+                        'line-color': '#FF0000',
+                        'line-width': 4
+                    }
+                });
+            }
+        }
+        function removeRoute(routeId) {
+            if (map.getLayer(routeId)) {
+                map.removeLayer(routeId);
+            }
+            if (map.getSource(routeId)) {
+                map.removeSource(routeId);
+            }
+        }
+
+
+        function addCriticalAlert(taxi,message) {
+            const alertList = document.getElementById('alert-list');
+            const existingAlert = document.getElementById(`alert-${taxi.plate_number}`);
+        
+            if (!existingAlert) {
+                const alertItem = document.createElement('li');
+                alertItem.id = `alert-${taxi.plate_number}`;
+                alertItem.style.cursor = 'pointer';
+                alertItem.style.padding = '6px';
+                alertItem.style.borderBottom = '1px solid #ccc';
+        
+                alertItem.innerHTML = `
+                    <strong>Taxi ${taxi.plate_number}</strong><br>
+                    Message: ${message}<br>
+                    Location: (${taxi.current_lat.toFixed(4)}, ${taxi.current_lon.toFixed(4)})
+                `;
+        
+                alertItem.addEventListener('click', () => {
+                    map.flyTo({
+                        center: [taxi.current_lon, taxi.current_lat],
+                        zoom: 16,
+                        speed: 1.2
+                    });
+                });
+        
+                alertList.appendChild(alertItem);
+            }
+        }
+        
+
+        // Track lines per taxi
+        const livePaths = {}; // { plate_number: { sourceId, layerId } }
+
+        function updateLivePath(plate_number, coordsList) {
+            const sourceId = `live-path-src-${plate_number}`;
+            const layerId = `live-path-layer-${plate_number}`;
+
+            const geojson = {
+                type: "Feature",
+                geometry: {
+                    type: "LineString",
+                    coordinates: coordsList,
+                },
+            };
+
+            if (!map.getSource(sourceId)) {
+                // First time adding
+                map.addSource(sourceId, {
+                    type: "geojson",
+                    data: geojson,
+                });
+
+                map.addLayer({
+                    id: layerId,
+                    type: "line",
+                    source: sourceId,
+                    layout: {
+                        "line-join": "round",
+                        "line-cap": "round",
+                    },
+                    paint: {
+                        "line-color": "#32CD32", // lime green
+                        "line-width": 2,
+                        "line-opacity": 0.8,
+                    },
+                });
+
+                livePaths[plate_number] = { sourceId, layerId };
+            } else {
+                // Just update the data
+                const src = map.getSource(sourceId);
+                if (src) src.setData(geojson);
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        const filterSelect = document.getElementById('taxi-filter');
+        const modeSelect = document.getElementById('filter-mode');
+
+        let currentFilter = 'all';
+        let filterMode = 'display';
+
+        filterSelect.addEventListener('change', e => {
+        currentFilter = e.target.value;
+        refreshMarkers(); // hide/remove based on new filter
+        });
+
+        modeSelect.addEventListener('change', e => {
+        filterMode = e.target.value;
+        refreshMarkers(); // refresh based on new mode
+        });
+
+
+        function refreshMarkers() {
+            Object.values(taxiMarkers).forEach(marker => marker.remove());
+            taxiMarkers = {};
+          }
+          
+
+
+        function isTaxiIncluded(taxi) {
+            switch (currentFilter) {
+              case 'on_trip':
+                return taxi.current_status === true;
+              case 'not_on_trip':
+                return taxi.current_status === false;
+              case 'danger':
+                return taxi.passenger_in_danger === true;
+              case 'all':
+              default:
+                return true;
+            }
+          }
+          
+
+
+
+
+
+          
+          // Load the taxi icon image
+          map.loadImage('/static/taxi.png', (error, image) => {
+              if (error) {
+                  console.error("Error loading taxi icon:", error);
+                  return;
+                }
+                map.addImage('taxi', image);
+            });
+        const socket = new WebSocket('ws://127.0.0.1:8000/ws/taxi/updates/');
+
+
+let previousPosition = {};
+let animationFrameIds = {};
+
+function animateMarker(marker, start, end, duration = 1000, taxiId) {
+  const startTime = performance.now();
+  // Cancel any in-flight animation for this taxi
+  if (animationFrameIds[taxiId]) cancelAnimationFrame(animationFrameIds[taxiId]);
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const lng = start.lng + (end.lng - start.lng) * t;
+    const lat = start.lat + (end.lat - start.lat) * t;
+    marker.setLngLat([lng, lat]);
+
+    if (t < 1) {
+      animationFrameIds[taxiId] = requestAnimationFrame(animate);
+    }
+  }
+
+  animationFrameIds[taxiId] = requestAnimationFrame(animate);
+}
+
+socket.onmessage = function(event) {
+  const taxis = JSON.parse(event.data);
+  console.log("=== Incoming Taxi Data ===", taxis);
+  console.log(`Filter Mode: ${filterMode}, Filter: ${currentFilter}`);
+
+  let visibleCount = 0, hiddenCount = 0, skippedCount = 0;
+
+  taxis.forEach(taxi => {
+    const included = isTaxiIncluded(taxi);
+
+    if (filterMode === 'strict') {
+      if (!included) {
+        console.log(`[STRICT] Skipping taxi ${taxi.plate_number}`);
+        skippedCount++;
+        return;
+      }
+      console.log(`[STRICT] Processing taxi ${taxi.plate_number}`);
+    }
+
+    if (filterMode === 'display') {
+      if (!included) {
+        hiddenCount++;
+        if (taxiMarkers[taxi.plate_number]) {
+          taxiMarkers[taxi.plate_number].getElement().style.display = 'none';
+        }
+      } else {
+        visibleCount++;
+      }
+    }
+
+    // Determine new position
+    const newPos = { lat: taxi.current_lat, lng: taxi.current_lon };
+
+    // Add or update marker
+    if (!taxiMarkers[taxi.plate_number]) {
+      const marker = new mapboxgl.Marker({ element: createTaxiMarker(taxi) })
+        .setLngLat([newPos.lng, newPos.lat])
+        .addTo(map);
+
+      marker.getElement().addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleRoute(taxi);
+      });
+
+      taxiMarkers[taxi.plate_number] = marker;
+      previousPosition[taxi.plate_number] = newPos;
+    } else {
+      const marker = taxiMarkers[taxi.plate_number];
+
+      // Smoothly animate from previousPosition to newPos
+      const startPos = previousPosition[taxi.plate_number] || newPos;
+      animateMarker(marker, startPos, newPos, 1000, taxi.plate_number);
+      previousPosition[taxi.plate_number] = newPos;
+
+      // Ensure marker is shown if it should be
+      if (included || filterMode === 'strict') {
+        marker.getElement().style.display = '';
+      }
+    }
+
+    // Handle critical alerts
+    if (taxi.passenger_in_danger) {
+      console.log(`[ALERT] Passenger in danger for ${taxi.plate_number}`);
+      addCriticalAlert(taxi, "Passenger is in danger. Ride ended far from destination!!!");
+    }
+
+    alertlistener(taxi);
+  });
+
+  console.log(`Summary: Processed ${taxis.length} taxis`);
+  if (filterMode === 'strict') {
+    console.log(`→ Skipped (not matching filter): ${skippedCount}`);
+  } else {
+    console.log(`→ Hidden: ${hiddenCount}, Visible: ${visibleCount}`);
+  }
+
+  console.log("=== Current Taxi Markers ===", taxiMarkers);
+};
+
+        
+
+        function alertlistener(taxi) {
+            if (taxi.metrics && taxi.metrics.anomaly && taxi.metrics.anomaly.type) {
+                const rawTypes = taxi.metrics.anomaly.type;
+                const types = Array.isArray(rawTypes)
+                    ? rawTypes
+                    : rawTypes.split(",").map(t => t.trim());
+        
+                const list = document.getElementById("anomaly-list");
+        
+                types.forEach(type => {
+                    anomalyCounts[type] = (anomalyCounts[type] || 0) + 1;
+        
+                    const alertId = `${taxi.plate_number}-${type}-${Date.now()}`;
+                    const li = document.createElement("li");
+                    li.setAttribute("id", alertId);
+                    li.style.marginBottom = "10px";
+        
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.style.marginRight = "10px";
+                    checkbox.addEventListener("change", () => {
+                        document.getElementById(alertId).remove();
+                        removeAnomalyMarkers(); // remove all shown markers
+                    });
+        
+                    const label = document.createElement("label");
+                    label.textContent = `🚨 [${taxi.plate_number}] ${type.toUpperCase()} (Total: ${anomalyCounts[type]})`;
+        
+                    // 📍 Add click-to-focus functionality
+                    label.style.cursor = "pointer";
+                    label.addEventListener("click", () => {
+                        if (
+                            taxi.current_ride_name &&
+                            taxi.current_ride_name !== "unknown" &&
+                            taxi.current_ride_name.trim() !== "No ride selected"
+                        ) {
+                            console.log("Focused anomaly type:", type);
+        
+                            fetch(`/api/anomalies/${encodeURIComponent(taxi.current_ride_name)}/`)
+                                .then(res => res.json())
+                                .then(anomalies => {
+                                    // remove previously shown anomaly markers
+                                    removeAnomalyMarkers();
+        
+                                    const filtered = anomalies.filter(a => a.type === type);
+        
+                                    if (filtered.length === 0) {
+                                        alert(`No "${type}" anomalies found for ${taxi.plate_number}`);
+                                        return;
+                                    }
+        
+                                    filtered.forEach(anomaly => {
+                                        const marker = new mapboxgl.Marker({ color: 'red' })
+                                            .setLngLat([anomaly.long, anomaly.lat])
+                                            .setPopup(new mapboxgl.Popup().setHTML(`
+                                                <strong>${anomaly.type}</strong><br>
+                                                ${new Date(anomaly.timestamp).toLocaleString()}
+                                                <br><strong>Details: ${anomaly.lat}, ${anomaly.long}</strong> 
+                                                <hr>
+                                                <strong>Details:</strong><br>
+                                                <pre>${JSON.stringify(anomaly.metrics, null, 2)}</pre>
+                                            `))
+                                            .addTo(map);
+        
+                                        currentAnomalyMarkers.push(marker);
+                                    });
+        
+                                    // optionally fly to first result
+                                    if (filtered.length > 0) {
+                                        map.flyTo({ center: [filtered[0].long, filtered[0].lat], zoom: 15 });
+                                    }
+                                })
+                                .catch(err => console.error("Error fetching anomalies:", err));
+                        }
+                    });
+        
+                    li.appendChild(checkbox);
+                    li.appendChild(label);
+                    list.appendChild(li);
+                });
+            }
+        }
+        
+
+
+        
+
+        function createTaxiMarker(taxi) {
+            const img = document.createElement("img");
+            img.src = "/static/taxi.png"; 
+            img.style.width = "30px";
+            img.style.height = "30px";
+            img.style.cursor = "pointer";
+            img.title = `Taxi: ${taxi.plate_number}`;
+            img.dataset.driverName = taxi.driver_name;  // Store driver name in the marker element
+
+            return img;
+        }
+
+        
+        map.on('zoom', () => {
+            const zoom = map.getZoom();
+            let size = 30;
+        
+            if (zoom >= 20) size = 45;
+            else if (zoom >= 18) size = 35;
+            else if (zoom >= 16) size = 25;
+            else size = 20;
+        
+            Object.values(taxiMarkers).forEach(marker => {
+                const el = marker.getElement();
+                el.style.width = `${size}px`;
+                el.style.height = `${size}px`;
+            });
+        });
+
+        
+
+        const searchInput = document.getElementById('plateNumberSearch');
+
+        function flyToPlate(plate) {
+          const plateNumber = plate.trim().toUpperCase();
+          const taxi = taxiMarkers[plateNumber];
+          if (!taxi) return false;
+    
+          const taxiLatLng = taxi.getLngLat();
+          map.flyTo({ center: taxiLatLng, zoom: 14 });
+    
+          new mapboxgl.Popup()
+            .setLngLat(taxiLatLng)
+            .setHTML(`<strong>Plate:</strong> ${plateNumber}<br><strong>Driver:</strong> ${driverName || 'Unknown'}`)
+            .addTo(map);
+    
+          return true;
+        }
+    
+        // 1) On load: read URL, trigger once if present
+        (function triggerOnLoad() {
+          const params = new URLSearchParams(window.location.search);
+          const initialPlate = params.get('plate');
+          if (initialPlate) {
+            // populate input for UX
+            searchInput.value = initialPlate.trim().toUpperCase();
+            // fly immediately
+
+            setTimeout(() => {
+              flyToPlate(initialPlate);
+            }, 1000);
+            
+          }
+        })();
+    
+        // 2) On further typing: reuse same function
+        searchInput.addEventListener('input', function(e) {
+          flyToPlate(e.target.value);
+        });
+        
+
+        socket.onopen = function(event) {
+            console.log("✅ WebSocket connected");
+
+            console.log("WebSocket connection established from admin dashboard");
+        };
+
+        socket.onclose = function(event) {
+            console.log("WebSocket connection closed");
+        };
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .row {
+            display: flex;
+            justify-content: center;
+          }
+          
+          .column {
+            flex-basis: 50%;
+            margin: 20px;
+          }
+    </style>
+</head>
+<body class="bg-red flex items-center justify-center min-h-screen" style="background-color: lightblue"> 
+    <div class="row">
+        <div class="column bg-white p-8 rounded-2xl shadow-md max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Register as Driver</h2>
+    
+            <form method="post" class="space-y-5">
+                {% csrf_token %}
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    {{ form.username }}
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700" required='False'>Driver License number</label>
+                    {{ form.license_number }}
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    {{ form.phone_number }}
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Latitude to create taxi at</label>
+                    <input type="text" name="new_taxi_lat" value="43.20984">
+                    
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700" >Longitude to create taxi at</label>
+                    <input type="text" name="new_taxi_lon" value="76.91678">
+                    
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Telegram Chat ID</label>
+                    {{ form.telegram_chat_id }}
+                </div>
+    
+    
+                <div hidden>
+                    <label class="block text-sm font-medium text-gray-700" >Register As</label>
+                    {{ form.role }}
+                </div>
+    
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition duration-200">
+                    Register
+                </button>
+            </form>
+        </div>
+        <div class="column bg-white p-8 rounded-2xl shadow-md max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Register as Passenger</h2>
+    
+            <form method="post" class="space-y-5">
+                {% csrf_token %}
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    {{ form.username }}
+                </div>
+    
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    {{ form.phone_number }}
+                </div>
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Telegram Chat ID</label>
+                    {{ form.telegram_chat_id }}
+                </div>
+    
+    
+                <div>
+                    <label class="block text-sm font-medium text-gray-700" hidden >Register As</label>
+                    <input type="text" name="role" value="customer" hidden>                </div>
+    
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition duration-200">
+                    Register
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

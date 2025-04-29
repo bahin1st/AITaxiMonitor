@@ -1,0 +1,47 @@
+# Virtual environment
+venv/
+.env
+*.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Django-related
+*.log
+db.sqlite3
+media/
+staticfiles/
+*.sqlite3
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Output / temp files
+output.*
+*.png
+
+# Dataset and log files (optional — comment out if you want to keep in git)
+*.xlsx
+*.csv
+trip_log
+
+# Git itself
+.git/
+
+# Ignore compiled models or cache
+*.h5
+*.pkl
+*.joblib
+*.npy
+*.npz

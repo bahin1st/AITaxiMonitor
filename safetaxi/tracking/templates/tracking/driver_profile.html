@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <div class="flex items-center">
+                    <i class="fas fa-taxi text-3xl mr-3"></i>
+                    <h1 class="text-2xl font-bold"><a href="{% url "driver_navigation_dashboard" driver.user.username %}">Driver Dashboard</a></h1>
+                </div>
+                <div class="flex items-center">
+                    <span class="mr-4">Welcome, <span id="driver-name">{{driver.user.username}}</span></span>
+                    <a href="#" class="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-md text-sm">Logout</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="container mx-auto px-4 py-8">
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <div class="rounded-full bg-blue-100 p-3 mr-4">
+                            <i class="fas fa-road text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-gray-500 text-sm">Total Trips</h3>
+                            <p class="text-2xl font-bold" id="total-trips">{{trips.count}}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <div class="rounded-full bg-green-100 p-3 mr-4">
+                            <i class="fas fa-tachometer-alt text-green-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-gray-500 text-sm">Total Distance</h3>
+                            <p class="text-2xl font-bold" id="total-distance">{{total_distance}} km</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <div class="rounded-full bg-yellow-100 p-3 mr-4">
+                            <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                        </div>
+                        
+                            <h3 class="text-gray-500 text-sm">Weekly Anomalies</h3>
+                            <p class="text-2xl font-bold" id="weekly-anomalies">{{weekly_anomalies.count}}</p>
+                        
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <div class="rounded-full bg-red-100 p-3 mr-4">
+                            <i class="fas fa-star text-red-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-gray-500 text-sm">Avg. Rating</h3>
+                            <p class="text-2xl font-bold" id="avg-rating">{{average_rating}}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 class="text-xl font-bold mb-4 text-gray-700">Driver Information</h2>
+                        <div class="flex justify-center mb-4">
+                            <div class="rounded-full bg-blue-100 p-6">
+                                <i class="fas fa-user text-blue-600 text-4xl"></i>
+                            </div>
+                        </div>
+                        <form id="driver-form" class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Username</label>
+                                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100" id="username" type="text" value="{{driver.user.username}}" disabled>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="license-number">License Number</label>
+                                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="license-number" type="text" value="{{driver.license_number}}">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="phone-number">Phone Number</label>
+                                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100" id="phone-number" type="text" value="{{driver.phone_number}}" disabled>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="telegram-chat-id">Telegram Chat ID</label>
+                                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="telegram-chat-id" type="text" value="{{driver.telegram_chat_id}}">
+                            </div>
+                            <div class="flex justify-end">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                                    Update Information
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-bold mb-4 text-gray-700">Vehicle Information</h2>
+                        <div class="mb-4 flex justify-center">
+                            <div class="rounded-full bg-gray-100 p-6">
+                                <i class="fas fa-car text-gray-600 text-4xl"></i>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <span class="font-semibold text-gray-700">Plate Number:</span>
+                                <span class="ml-2">{{driver.assigned_taxi.plate_number}}</span>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-gray-700">Model:</span>
+                                <span class="ml-2">{{driver.assigned_taxi.model}}</span>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-gray-700">Current Status:</span>
+                                <span class="ml-2">{{driver.assigned_taxi.on_trip_status}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 class="text-xl font-bold mb-4 text-gray-700">Weekly Anomalies</h2>
+                            <div style="max-height: 800px; overflow-y: auto;">
+                                <table class="w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Type</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Location</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Date & Time</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Details</th>
+                                    </tr>
+                                </thead>
+                                
+                                <tbody>
+                                    {% for anomaly in weekly_anomalies %}
+                                    <tr class="border-b border-gray-200">
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-1 font-semibold text-xs text-red-600 bg-red-100 rounded-full">
+                                                {{anomaly.type}}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm">{{anomaly.lat}}, {{anomaly.long}}</td>
+                                        <td class="px-4 py-3 text-sm">{{anomaly.timestamp|date:"M d, Y H:i"}}</td>
+                                        <td class="px-4 py-3 text-sm">
+                                            <button 
+                                                class="text-blue-600 hover:text-blue-800"
+                                                onclick='showAnomalyDetails({
+                                                    "type": "{{ anomaly.type|escapejs }}",
+                                                    "timestamp": "{{ anomaly.timestamp|date:'F d, Y H:i' }}",
+                                                    "lat": "{{ anomaly.lat }}",
+                                                    "long": "{{ anomaly.long }}",
+                                                    "ride": "{{ anomaly.ride_name|escapejs }}",
+                                                })'>
+                                                View Details
+                                            </button>
+
+
+
+
+
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-3 text-sm text-center text-gray-500">No weekly anomalies found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    
+                    
+                    <!-- Recent Trips -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-gray-700">Past Trips</h2>
+                            
+                        </div>
+                        <div style="max-height: 500px; overflow-y: auto;">
+                            <table class="w-full table-auto">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Trip Name</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Date</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Distance</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Duration</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Rating</th>
+                                        <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Anomalies</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for trip in trips %}
+                                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                        <td class="px-4 py-3 text-sm font-medium">{{trip.trip_name}}</td>
+                                        <td class="px-4 py-3 text-sm">{{trip.start_time|date:"M d, Y H:i"}}</td>
+                                        <td class="px-4 py-3 text-sm">{{trip.distance}} km</td>
+                                        <td class="px-4 py-3 text-sm">{{trip.duration}} min</td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center">
+                                                <span class="text-sm mr-1">{{trip.rating}}</span>
+                                                <i class="fas fa-star text-yellow-400 text-sm"></i>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm">
+                                            {% if trip.anomaly_count > 0 %}
+                                                <span class="px-2 py-1 font-semibold text-xs text-red-600 bg-red-100 rounded-full">
+                                                    {{ trip.anomaly_count }}
+                                                </span>
+                                            {% else %}
+                                                <span class="px-2 py-1 font-semibold text-xs text-green-600 bg-green-100 rounded-full">
+                                                    {{ trip.anomaly_count }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="px-4 py-3 text-sm text-center text-gray-500">No trips found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white mt-8 py-4 border-t">
+            <div class="container mx-auto px-4">
+                <p class="text-center text-gray-500 text-sm">© 2025 Taxi Management System. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Anomaly Details Modal -->
+    <div id="anomaly-modal" class="hidden fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-1/2">
+            <h3 class="text-lg font-bold mb-4">Anomaly Details</h3>
+            <p><strong>Type:</strong> <span id="anomaly-type"></span></p>
+            <p><strong>Timestamp:</strong> <span id="anomaly-timestamp"></span></p>
+            <p><strong>Location:</strong> <span id="anomaly-location"></span></p>
+            <p><strong>Ride:</strong> <span id="anomaly-ride"></span></p>
+            <p><strong>Metrics:</strong> <div id="anomaly-metrics"></div></p>
+            <button onclick="closeAnomalyModal()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded">Close</button>
+        </div>
+    </div>
+    
+
+    <script>
+        document.getElementById('driver-form').addEventListener('submit', function(e) {
+            const username = "{{ driver.user.username }}"
+            e.preventDefault();
+            const licenseNumber = document.getElementById('license-number').value;
+            const telegramChatId = document.getElementById('telegram-chat-id').value;
+            
+            fetch(`/update_driver_info/${username}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    license_number: licenseNumber,
+                    telegram_chat_id: telegramChatId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Information updated successfully!');
+                } else {
+                    alert('Error updating information: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating information.');
+            });
+        });
+
+        // Anomaly modal functionality
+        function showAnomalyDetails(anomaly) {
+            document.getElementById('anomaly-type').textContent = anomaly.type;
+            document.getElementById('anomaly-timestamp').textContent = anomaly.timestamp;
+            document.getElementById('anomaly-location').textContent = `${anomaly.lat}, ${anomaly.long}`;
+            document.getElementById('anomaly-ride').textContent = anomaly.ride;
+        
+            
+        
+            document.getElementById('anomaly-modal').classList.remove('hidden');
+        }
+        
+
+        function closeAnomalyModal() {
+            document.getElementById('anomaly-modal').classList.add('hidden');
+        }
+
+        
+
+        // Helper function to get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

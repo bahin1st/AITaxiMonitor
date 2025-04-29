@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Users & Taxis</title>
+    <style>
+        body {
+            background-color: #007BFF; /* Bootstrap blue */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 2rem;
+            font-family: Arial, sans-serif;
+        }
+
+        .user-circle {
+            width: 250px;
+            height: 250px;
+            background-color: white;
+            border-radius: 50%;
+            margin: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: #007BFF;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .user-circle:hover {
+            transform: scale(1.05);
+        }
+
+        .username {
+            font-weight: bold;
+        }
+
+        .taxi {
+            font-size: 0.9rem;
+        }
+        .top_butons{
+            height: 100px;
+            width: 200px;
+            background-color: white;
+            border-radius: 10px;
+            margin: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: #007BFF;
+        }
+        .top_butons:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    
+        <a href="{% url 'register'%}" class="top_butons" target="_blank">Register as a driver</a>
+        <a href="{% url 'map_monitor' %}" class="top_butons" target="_blank"> Monitoring Map</a>
+        <a href="{% url 'dashboard' %}" class="top_butons" target="_blank">General Monitor</a>
+    
+
+    <hr style="height: 2px; background-color: white; width: 100%;">
+    <p style="color: white;">Choose one to go to Driver's Map'</p>
+
+{% for driver in drivers %}
+    <a href="{% url 'driver_navigation_dashboard' driver%}" class="user-circle" target="_blank">
+        <div class="username"><span>Driver Name: {{ driver.user.username }}</div>
+        <div class="taxi">Taxi: {{ driver.assigned_taxi.model|default:"No mdoel" }}</div>
+        <div class="taxi">Plate: {{ driver.assigned_taxi|default:"No mdoel" }}</div>
+    </a>
+{% endfor %}
+<hr style="height: 2px; background-color: white; width: 100%;">
+<p style="color: white;">Choose one to go to driver's details page'</p>
+
+{% for driver in drivers %}
+    <a href="{% url 'driver_details' driver%}" class="user-circle" target="_blank">
+        <div class="username"><span>Driver Name: {{ driver.user.username }}</div>
+        <div class="taxi">Taxi: {{ driver.assigned_taxi.model|default:"No mdoel" }}</div>
+        <div class="taxi">Plate: {{ driver.assigned_taxi|default:"No mdoel" }}</div>
+    </a>
+{% endfor %}
+
+</body>
+</html>

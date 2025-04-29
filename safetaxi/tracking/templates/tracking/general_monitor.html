@@ -1,0 +1,955 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+<style>
+    .card {
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .dashboard-stat {
+        text-align: center;
+        padding: 15px;
+    }
+    .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .stat-label {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    .stat-card {
+        transition: transform 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .table-responsive {
+        border-radius: 8px;
+    }
+    .anomaly-harsh {
+        background-color: #ffecec;
+    }
+    .status-active {
+        color: #28a745;
+    }
+    .status-inactive {
+        color: #dc3545;
+    }
+    .btn-filter {
+        margin-top: 20px;
+    }
+    .filter-form {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+<body>
+ 
+<div class="container-fluid">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center">
+            <i class="fas fa-taxi text-3xl mr-3"></i>
+            <h1 class="text-2xl font-bold">General Monitoring Dashboard</h1>
+        </div>
+        <div class="flex items-center">
+            <span class="mr-4">Welcome, <span id="driver-name"></span></span>
+            <a href="#" class="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-md text-sm">Logout</a>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    
+    
+    <!-- Overview Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ total_drivers }}</div>
+                    <div class="stat-label">Total Drivers</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ total_taxis }}</div>
+                    <div class="stat-label">Total Taxis</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ active_taxis }}</div>
+                    <div class="stat-label">Active Taxis</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ taxis_on_trip_count }}</div>
+                    <div class="stat-label">Taxis Currently on Trip</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ today_trip_count }}</div>
+                    <div class="stat-label">Today's Trips</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ today_trip_distance|floatformat:1 }} km</div>
+                    <div class="stat-label">Today's Distance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ today_anomaly_count }}</div>
+                        
+                    <div class="stat-label">Today's Anomalies</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body dashboard-stat">
+                    <div class="stat-number">{{ weekly_anomaly_count }}</div>
+                    <div class="stat-label">Weekly Anomalies</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Dashboard Content -->
+    <div class="row">
+        <div class="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-lg max-w-3xl mx-auto" style="border-radius: 10px; box-shadow: blue 0px 0px 10px;">
+            <!-- Chart Heading -->
+            <h2 class="text-2xl font-bold mb-6 text-blue-700">Anomalies' Radar chart (Last 30 Days)</h2>
+        
+            <!-- Radar Chart Canvas -->
+            <div class="w-full flex justify-center">
+                <canvas id="anomalyRadarChart" class="max-w-[500px] w-full h-[500px]" ></canvas>
+            </div>
+        </div>
+       
+    </div>
+    
+    <!-- Taxi Status Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Taxis On Trip</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Plate Number</th>
+                                    <th>Model</th>
+                                    <th>Driver</th>
+                                    <th>Current Trip</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for taxi in taxis_on_trip %}
+                                <tr>
+                                    <td>{{ taxi.plate_number }}</td>
+                                    <td>{{ taxi.model }}</td>
+                                    <td>
+                                        {% for driver in drivers %}
+                                            {% if driver.assigned_taxi == taxi %}
+                                            <a href="{% url 'driver_details' driver.user.username %}">{{ driver.user.username }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>{{ taxi.current_ride_name }}</td>
+                                    <td>{{ taxi.current_lat|floatformat:4 }}, {{ taxi.current_lon|floatformat:4 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No taxis currently on trip</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Taxis Not On Trip</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Plate Number</th>
+                                    <th>Model</th>
+                                    <th>Driver</th>
+                                    <th>Status</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for taxi in taxis_not_on_trip %}
+                                <tr>
+                                    <td>{{ taxi.plate_number }}</td>
+                                    <td>{{ taxi.model }}</td>
+                                    <td>
+                                        {% for driver in drivers %}
+                                            {% if driver.assigned_taxi == taxi %}
+                                            <a href="{% url 'driver_details' driver.user.username %}">{{ driver.user.username }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if taxi.is_active %}
+                                            <span class="status-active"><i class="fas fa-circle"></i> Active</span>
+                                        {% else %}
+                                            <span class="status-inactive"><i class="fas fa-circle"></i> Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ taxi.current_lat|floatformat:4 }}, {{ taxi.current_lon|floatformat:4 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">All taxis are currently on trip</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">All Taxis</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover" >
+                    <thead>
+                        <tr>
+                            <th>Plate Number</th>
+                            <th>Model</th>
+                            <th>Current Location</th>
+                            <th>Active Status</th>
+                            <th>Trip Status</th>
+                            <th>Current Ride</th>
+                            <th>Metrics</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for taxi in taxis %}
+                        <tr>
+                            <td>{{ taxi.plate_number }}</td>
+                            <td>{{ taxi.model }}</td>
+                            <td>{{ taxi.current_lat|floatformat:4 }}, {{ taxi.current_lon|floatformat:4 }}</td>
+                            <td>
+                                {% if taxi.is_active %}
+                                    <span class="status-active"><i class="fas fa-circle"></i> Active</span>
+                                {% else %}
+                                    <span class="status-inactive"><i class="fas fa-circle"></i> Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ taxi.on_trip_status }}</td>
+                            <td>{{ taxi.current_ride_name }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#taxiModal{{ taxi.id }}">
+                                    View Metrics
+                                </button>
+                                
+                                <!-- Modal for metrics details -->
+                                <div class="modal fade" id="taxiModal{{ taxi.id }}" tabindex="-1" aria-labelledby="taxiModalLabel{{ taxi.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="taxiModalLabel{{ taxi.id }}">{{ taxi.plate_number }} Metrics</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <h6>Current Metrics:</h6>
+                                                <ul class="list-group">
+                                                    {% for key, value in taxi.current_metrics.items %}
+                                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                            {{ key }}
+                                                            <span class="badge bg-primary rounded-pill">{{ value }}</span>
+                                                        </li>
+                                                    {% empty %}
+                                                        <li class="list-group-item">No metrics available</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No taxis registered</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                    <i class="fas fa-filter"></i> Filters
+                </button>
+            </h5>
+        </div>
+        <div id="filterCollapse" class="collapse show">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-2">
+                        <label for="driver" class="form-label">Driver</label>
+                        <select name="driver" id="driver" class="form-select">
+                            <option value="">All Drivers</option>
+                            {% for driver in drivers %}
+                                <option value="{{ driver.id }}" {% if selected_driver == driver.id|stringformat:"i" %}selected{% endif %}>
+                                    {{ driver.user.username }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="taxi" class="form-label">Taxi</label>
+                        <select name="taxi" id="taxi" class="form-select">
+                            <option value="">All Taxis</option>
+                            {% for taxi in taxis %}
+                                <option value="{{ taxi.id }}" {% if selected_taxi == taxi.id|stringformat:"i" %}selected{% endif %}>
+                                    {{ taxi.plate_number }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="anomaly_type" class="form-label">Anomaly Type</label>
+                        <select name="anomaly_type" id="anomaly_type" class="form-select">
+                            <option value="">All Types</option>
+                            {% for anomaly_type in all_anomaly_types %}
+                                <option value="{{ anomaly_type }}" {% if selected_anomaly_type == anomaly_type %}selected{% endif %}>
+                                    {{ anomaly_type }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_from" class="form-label">Date From</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ selected_date_from }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_to" class="form-label">Date To</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ selected_date_to }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Today's Trips -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Today's Trips</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Trip Name</th>
+                            <th>Driver</th>
+                            <th>Taxi</th>
+                            <th>Start Time</th>
+                            <th>Finish Time</th>
+                            <th>Distance (km)</th>
+                            <th>Duration (min)</th>
+                            <th>Rating</th>
+                            <th>Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trip in today_trips %}
+                        <tr>
+                            <td>{{ trip.trip_name }}</td>
+                            <td><a href="{% url 'driver_details' trip.driver.user.username %}">{{ trip.driver.user.username }}</td>
+                            <td>{{ trip.taxi.plate_number }}</td>
+                            <td>{{ trip.start_time|date:"H:i:s" }}</td>
+                            <td>{% if trip.finish_time %}{{ trip.finish_time|date:"H:i:s" }}{% else %}In progress{% endif %}</td>
+                            <td>{{ trip.distance|floatformat:1 }}</td>
+                            <td>{{ trip.duration|floatformat:0 }}</td>
+                            <td>
+                                {% if trip.rating > 0 %}
+                                    <div class="rating">
+                                        {% for i in "12345678910" %}
+                                            {% if forloop.counter <= trip.rating %}
+                                                <i class="fas fa-star text-warning"></i>
+                                            {% elif forloop.counter <= trip.rating|add:"1" %}
+                                                <i class="fas fa-star-half-alt text-warning"></i>
+                                            {% else %}
+                                                <i class="far fa-star text-warning"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    Not rated
+                                {% endif %}
+                            </td>
+                            <td><button onclick="summarizeModal('summarize_trip', '{{ trip.trip_name }}')" class="btn btn-primary">Get Summary</button></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center">No trips found for today</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weekly Trips -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Weekly Trips</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover" >
+                    <thead>
+                        <tr>
+                            <th>Trip Name</th>
+                            <th>Driver</th>
+                            <th>Taxi</th>
+                            <th>Date</th>
+                            <th>Distance (km)</th>
+                            <th>Duration (min)</th>
+                            <th>Rating</th>
+                            <th>Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trip in weekly_trips %}
+                        <tr>
+                            <td>{{ trip.trip_name }}</td>
+                            <td><a href="{% url 'driver_details' trip.driver.user.username %}">{{ trip.driver.user.username }}</td>
+                            <td>{{ trip.taxi.plate_number }}</td>
+                            <td>{{ trip.start_time|date:"d/m/Y" }}</td>
+                            <td>{{ trip.distance|floatformat:1 }}</td>
+                            <td>{{ trip.duration|floatformat:0 }}</td>
+                            <td>
+                                {% if trip.rating > 0 %}
+                                    <div class="rating">
+                                        {% for i in "12345678910" %}
+                                            {% if forloop.counter <= trip.rating %}
+                                                <i class="fas fa-star text-warning"></i>
+                                            {% elif forloop.counter <= trip.rating|add:"1" %}
+                                                <i class="fas fa-star-half-alt text-warning"></i>
+                                            {% else %}
+                                                <i class="far fa-star text-warning"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    Not rated
+                                {% endif %}
+                            </td>
+                            <td><button onclick="summarizeModal('summarize_trip', '{{ trip.trip_name }}')" class="btn btn-primary">Get Summary</button></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No trips found for this week</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    
+    <!-- Today's Anomalies -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Today's Anomalies</h5>
+        </div>
+        <div class="card-body" >
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;" >
+                <table class="table table-hover" >
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Type</th>
+                            <th>Driver</th>
+                            <th>Taxi</th>
+                            <th>Ride</th>
+                            <th>Location</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anomaly in today_anomalies %}
+                        <tr class="{% if 'harsh' in anomaly.type|lower %}anomaly-harsh{% endif %}">
+                            <td>{{ anomaly.timestamp|date:"H:i:s" }}</td>
+                            <td><strong>{{ anomaly.type }}</strong></td>
+                            <td><a href="{% url 'driver_details' anomaly.driver.user.username %}">{{ anomaly.driver.user.username }}</td>
+                            <td>{{ anomaly.taxi.plate_number }}</td>
+                            <td>{{ anomaly.ride_name }}</td>
+                            <td>{{ anomaly.lat|floatformat:4 }}, {{ anomaly.long|floatformat:4 }}</td>
+                            <td>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#anomalyModal{{ anomaly.id }}">
+                                    View Metrics
+                                </button>
+                                
+                                <!-- Modal for metrics details -->
+                                <div class="modal fade" id="anomalyModal{{ anomaly.id }}" tabindex="-1" aria-labelledby="anomalyModalLabel{{ anomaly.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="anomalyModalLabel{{ anomaly.id }}">{{ anomaly.type }} Details</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <h2>Number codes for some categories:</h2>
+                                                <br>
+                                                <p>
+                                                    Time of day:<br>
+                                                    0=Night, 1=Morning, 2=Afternoon, 3=Evening<br>
+                                                    Type of road:<br>
+                                                    0=Highway, 1=City, 2=Rural<br>
+                                                    Road condition:<br>
+                                                    0=Dry, 1=Wet, 2=Snow, 3=Ice<br>
+                                                    Traffic condition: 0=Light, 1=Moderate, 2=Heavy<br>
+                                                </p>
+                                                <br>
+                                                <hr>
+                                                <h6>Anomaly Metrics:</h6>
+                                                <ul class="list-group">
+                                                    {% for key, value in anomaly.metrics.items %}
+                                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                            {{ key }}
+                                                            <span class="badge bg-primary rounded-pill">{{ value }}</span>
+                                                        </li>
+                                                    {% empty %}
+                                                        <li class="list-group-item">No detailed metrics available</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No anomalies detected today</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weekly Anomalies -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Weekly Anomalies</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover"  >
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Driver</th>
+                            <th>Taxi</th>
+                            <th>Ride</th>
+                            <th>Location</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anomaly in weekly_anomalies %}
+                        <tr class="{% if 'harsh' in anomaly.type|lower %}anomaly-harsh{% endif %}">
+                            <td>{{ anomaly.timestamp|date:"d/m/Y H:i" }}</td>
+                            <td><strong>{{ anomaly.type }}</strong></td>
+                            <td><a href="{% url 'driver_details' anomaly.driver.user.username %}">{{ anomaly.driver.user.username }}</td>
+                            <td>{{ anomaly.taxi.plate_number }}</td>
+                            <td>{{ anomaly.ride_name }}</td>
+                            <td>{{ anomaly.lat|floatformat:4 }}, {{ anomaly.long|floatformat:4 }}</td>
+                            <td>
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#anomalyModal{{ anomaly.id }}">
+                                    View Metrics
+                                </button>
+                                
+                                <!-- Modal for metrics details -->
+                                <div class="modal fade" id="anomalyModal{{ anomaly.id }}" tabindex="-1" aria-labelledby="anomalyModalLabel{{ anomaly.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="anomalyModalLabel{{ anomaly.id }}">{{ anomaly.type }} Details</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <h2>Number codes for some categories:</h2>
+                                                <br>
+                                                <p>
+                                                    Time of day:<br>
+                                                    0=Night, 1=Morning, 2=Afternoon, 3=Evening<br>
+                                                    Type of road:<br>
+                                                    0=Highway, 1=City, 2=Rural<br>
+                                                    Road condition:<br>
+                                                    0=Dry, 1=Wet, 2=Snow, 3=Ice<br>
+                                                    Traffic condition: 0=Light, 1=Moderate, 2=Heavy<br>
+                                                </p>
+                                                <br>
+                                                <hr>
+                                                <h6>Anomaly Metrics:</h6>
+                                                
+                                                <ul class="list-group">
+                                                    {% for key, value in anomaly.metrics.items %}
+                                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                            {{ key }}
+                                                            <span class="badge bg-primary rounded-pill">{{ value }}</span>
+                                                        </li>
+                                                    {% empty %}
+                                                        <li class="list-group-item">No detailed metrics available</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No anomalies detected this week</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Driver Performance Table -->
+    <div class="card mt-4">
+        <div class="card-header">
+            
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover"  >
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Driver</th>
+                            <th>Trips Completed</th>
+                            <th>Average Rating</th>
+                            <th>Anomalies</th>
+
+                            <th>Summary</th>
+                            
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for driver_data in driver_performance %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td><a href="{% url 'driver_details' driver_data.driver.user.username %}">{{ driver_data.driver.user.username }}</td>
+                            <td>{{ driver_data.trip_count }}</td>
+                            <td>
+                                {% if driver_data.avg_rating > 0 %}
+                                    <div class="rating">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= driver_data.avg_rating %}
+                                                <i class="fas fa-star text-warning"></i>
+                                            {% elif forloop.counter <= driver_data.avg_rating|add:"0.5" %}
+                                                <i class="fas fa-star-half-alt text-warning"></i>
+                                            {% else %}
+                                                <i class="far fa-star text-warning"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                        ({{ driver_data.avg_rating|floatformat:1 }})
+                                    </div>
+                                {% else %}
+                                    Not rated
+                                {% endif %}
+                            </td>
+                            <td>{{ driver_data.anomaly_count }}</td>
+                            <td><button onclick="summarizeModal('summarize_driver', '{{ driver_data.driver.user.username }}')" class="btn btn-primary">Get Summary</button></td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No driver data available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
+        <div class="bg-white p-8 rounded-xl max-w-4xl w-full h-[60vh] shadow-2xl relative">
+          <button id="close-summary" class="absolute top-4 right-4 text-gray-500 hover:text-black text-2xl">&times;</button>
+          <h2 class="text-2xl font-bold mb-6">Summary</h2>
+          <div id="summary-content" class="text-gray-800 whitespace-pre-line overflow-y-auto h-[calc(100%-4rem)]">
+            Loading...
+          </div>
+        </div>
+      </div>
+
+    
+    <!-- All Drivers Table -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">All Drivers</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 800px; overflow-y: scroll;">
+                <table class="table table-hover"  >
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>License Number</th>
+                            <th>Phone Number</th>
+                            <th>Assigned Taxi</th>
+                            <th>Telegram ID</th>
+                            <th>Current Location</th>
+                            <th>Weekly Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for driver in drivers %}
+                        <tr>
+                            <td><a href="{% url 'driver_details' driver.user.username %}">{{ driver.user.username }}</td>
+                            <td>{{ driver.license_number }}</td>
+                            <td>{{ driver.phone_number }}</td>
+                            <td>
+                                {% if driver.assigned_taxi %}
+                                    {{ driver.assigned_taxi.plate_number }} ({{ driver.assigned_taxi.model }})
+                                {% else %}
+                                    Not assigned
+                                {% endif %}
+                            </td>
+                            <td>{{ driver.telegram_chat_id|default:"Not set" }}</td>
+                            <td>
+                                {% if driver.assigned_taxi %}
+                                    {{ driver.assigned_taxi.current_lat|floatformat:4 }}, {{ driver.assigned_taxi.current_lon|floatformat:4 }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td><button class="btn btn-primary" onclick="summarizeModal('summarize_driver', '{{ driver.user.username }}')">Get Summary</button></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No drivers registered</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- All Taxis Table -->
+    
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Driver Performance Chart
+const labels = {{ anomaly_labels|safe }};
+const data = {{ anomaly_data|safe }};
+
+const ctx = document.getElementById('anomalyRadarChart').getContext('2d');
+new Chart(ctx, {
+    type: 'radar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Anomalies (Past Month)',
+            data: data,
+            fill: true,
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            borderColor: 'rgba(217, 157, 17, 0.8)',
+            pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#1e3a8a', // Tailwind's blue-800
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                }
+            },
+            title: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#1e40af',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+            }
+        },
+        scales: {
+            r: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.5)', // subtle grid lines
+                },
+                angleLines: {
+                    color: 'rgba(0, 0, 0, 0.2)'
+                },
+                pointLabels: {
+                    color: '#1e3a8a', // blue-800 for labels
+                    font: {
+                        size: 14
+                    }
+                },
+                ticks: {
+                    display: true,
+                    color: '#6b7280', // gray-500
+                    backdropColor: 'transparent',
+                    stepSize: 100
+                }
+            }
+        }
+    }
+});
+</script>
+<script>
+    async function summarizeModal(what, key) {
+      const modal = document.getElementById("summary-modal");
+      const content = document.getElementById("summary-content");
+      const closeBtn = document.getElementById("close-summary");
+      
+      content.textContent = "Loading summary...";
+      
+      modal.classList.remove("hidden");
+      let url = "";
+      let method = "GET";
+      let options = {};
+  
+      if (what === "summarize_driver") {
+        url = `/driver/${key}/summarize/`;  // assuming key is username
+        method = "POST";
+        options = {
+          method,
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+          },
+        };
+      } else if (what === "summarize_trip") {
+        url = `/trip/summarize/?trip_name=${encodeURIComponent(key)}`;
+        method = "GET";
+        options = { method };
+      } else {
+        content.textContent = "Invalid summary type.";
+        
+        return;
+      }
+  
+      try {
+        const resp = await fetch(url, options);
+        const data = await resp.json();
+  
+        if (data.summary) {
+          content.textContent = data.summary;
+        } else if (data.error) {
+          content.textContent = "Error: " + data.error;
+        } else {
+          content.textContent = "No summary available.";
+        }
+      } catch (error) {
+        content.textContent = "Failed to fetch summary.";
+        console.error(error);
+      }
+  
+      modal.classList.remove("hidden");
+    }
+  
+    document.getElementById("close-summary").addEventListener("click", () => {
+      document.getElementById("summary-modal").classList.add("hidden");
+    });
+  </script>
+  
+
+</body>
+</html>
