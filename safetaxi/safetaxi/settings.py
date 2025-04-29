@@ -92,7 +92,7 @@ CHANNEL_LAYERS = {
 # For llm
 geaiKey = "xxxxxxxxxxxxx"
 mapboxApiKey = "xxxxxxxxxxxxxxxxxx"
-BOT_TOKEN = "xxxxxxxxxxxxxxxxxx"
+BOT_TOKEN = "xxxxxxxxxxxxxxxxxxx"
 
 
 
