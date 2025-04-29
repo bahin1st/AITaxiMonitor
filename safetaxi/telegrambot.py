@@ -1,7 +1,8 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from django.conf import settings
 
-BOT_TOKEN = "7880331751:AAFjx7puCAbce9Eq4KfkWkEiw-B8OpBv5Z8"
+BOT_TOKEN=settings.BOT_TOKEN
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
