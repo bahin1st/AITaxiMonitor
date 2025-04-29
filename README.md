@@ -32,5 +32,14 @@ pip install -r requirements.txt
 daphne -b 127.0.0.1 -p 8000 safetaxi.asgi:application
 ---
 # Orientation views
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20225608.png)
+
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20195537.png)
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20202047.png)
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20202144.png)
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20195537.png)
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-25%20202220.png)
+![Map Screenshot](https://github.com/bahin1st/AITaxiMonitor/blob/master/orientation/Screenshot%202025-04-21%20142514.png)
+
 
 
